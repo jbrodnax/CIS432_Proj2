@@ -34,6 +34,7 @@ struct client_entry *client_test_search(char *name, struct _client_manager *clm)
 			return client;
 		client = client->next;
 	}
+	//printf("[-] Client (%s) NOT found.\n", name);
 	return NULL;
 }
 
@@ -84,7 +85,6 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 * Inits client_list if NULL;
 */
 	struct client_entry *new_client;
-	struct client_entry *list_tail;
 
 	if(!name || !clientaddr){
 		error_msg(client_err2);
@@ -112,7 +112,7 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 			client_list_tail(clm);
 
 		clm->list_tail->next = new_client;
-		new_client->prev = list_tail;
+		new_client->prev = clm->list_tail;
 	}
 	memset(new_client, 0, NAME_LEN);
 	memcpy(new_client->username, name, NAME_LEN);
@@ -121,8 +121,8 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 	/*Update list tail and number of clients*/
 	clm->list_tail = new_client;
 	clm->num_clients++;
-	puts("[+] New client added");
-	client_print(new_client);
+	//puts("[+] New client added");
+	//client_print(new_client);
 
 	return new_client;	
 }
@@ -143,10 +143,8 @@ int client_remove(char *name, struct _client_manager *clm){
 
 	//client = client_search(clientaddr, client_list);
 	client = client_test_search(name, clm);
-	if(!client){
-		printf("[-] Client (%s) NOT found.\n", name);
+	if(!client)	
 		return -1;
-	}
 
 	/*Unlink list node and update clm head or tail if unlinking head or tail*/
 	if(client->next && client->prev){
@@ -173,22 +171,20 @@ int client_remove(char *name, struct _client_manager *clm){
 
 void client_clean(struct _client_manager *clm){
 	struct client_entry *client;
-	struct client_entry *next_client;
 
-	if(!clm->list_head)
-		return;
+	while(1){
+		if(!clm->list_head || clm->num_clients < 1)
+			break;
 
-	client = clm->list_head;
-	while(client){
+		client = clm->list_head;
 		if(client->hostp)
 			free(client->hostp);
-		next_client = client->next;
-		puts("[+] Cleaning up client:\n");
-		client_print(client);
-		free(client);
-		client = next_client;
-	}
 
+		clm->list_head = client->next;	
+		free(client);
+		clm->num_clients--;
+	}
+	puts("[!] Client list is clean.");
 	return;
 }
 
