@@ -22,6 +22,8 @@
 #define TEXT_LEN	64
 #define LIST_LEN	128
 #define WHO_LEN		128
+/*Null-byte padding size for strings originating from user data*/
+#define STR_PADD	4
 
 /*Define request types sent from client to server*/
 #define REQ_LOGIN	0
