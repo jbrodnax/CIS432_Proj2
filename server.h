@@ -8,10 +8,17 @@ struct client_entry{
 	struct client_entry *prev;
 };
 
+struct _client_manager{
+	struct client_entry *list_head;
+	struct client_entry *list_tail;
+	int num_clients;
+};
+
+void client_print(struct client_entry *client);
 struct client_entry *client_search(struct sockaddr_in *clientaddr, struct client_entry *first);
-int client_init_list(struct client_entry *client_list);
-struct client_entry *client_list_tail(struct client_entry *client_list);
-struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, struct client_entry *client_list);
+struct client_entry *client_init_list();
+struct client_entry *client_list_tail(struct _client_manager *clm);
+struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, struct _client_manager *clm);
 //int client_remove(struct sockaddr_in *clientaddr, struct client_entry *client_list);
-int client_remove(char *name, struct client_entry *client_list);
-void client_clean(struct client_entry *client_list);
+int client_remove(char *name, struct _client_manager *clm);
+void client_clean(struct _client_manager *clm);

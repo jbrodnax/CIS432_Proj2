@@ -3,6 +3,7 @@
 char client_err1[]="Client list already initialized.";
 char client_err2[]="client_add received NULL argument.";
 char client_err3[]="client_remove received NULL clientaddr ptr.";
+char client_err4[]="client_list is empty.";
 
 void error_msg(char *err_msg){
 	if(!err_msg){
@@ -20,11 +21,13 @@ void client_print(struct client_entry *client){
 	}
 }
 
-struct client_entry *client_test_search(char *name, struct client_entry *first){
+struct client_entry *client_test_search(char *name, struct _client_manager *clm){
 	struct client_entry *client;
 
-	if(!name || !first)
+	if(!name || !clm)
 		return NULL;
+
+	client = clm->list_head;
 
 	while(client){
 		if(!strncmp(name, client->username, NAME_LEN))
@@ -58,37 +61,24 @@ struct client_entry *client_search(struct sockaddr_in *clientaddr, struct client
 	return NULL;
 }
 
-int client_init_list(struct client_entry *client_list){
-/*If client_list is empty, allocate space for first client and zero it out*/
-	if(client_list){
-		error_msg(client_err1);
-		return -1;
-	}
-	client_list = malloc(sizeof(struct client_entry));
-	if(!client_list){
-		error_msg(NULL);
-		return -1;
-	}
-	memset(client_list, 0, sizeof(struct client_entry));
-	return 0;
-}
-
-struct client_entry *client_list_tail(struct client_entry *client_list){
+struct client_entry *client_list_tail(struct _client_manager *clm){
 /*Returns ptr to last client_entry in list*/
 	struct client_entry *client;
 
-	if(!client_list)
+	if(!clm)
 		return NULL;
 	else
-		client = client_list;
+		client = clm->list_head;
 
 	while(client->next)
 		client = client->next;
 
+	clm->list_tail = client;
+
 	return client;
 }
 
-struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, struct client_entry *client_list){
+struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, struct _client_manager *clm){
 /*
 * Allocate new client_entry, fill with client info and add it to the tail of the client list.
 * Inits client_list if NULL;
@@ -100,31 +90,45 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 		error_msg(client_err2);
 		return NULL;
 	}
-	/*Init client_list if empty, in which case list tail is just equal to client_list*/
-	if(!client_list){
-		if(client_init_list(client_list) < 0)
-			exit(1);
-		list_tail = client_list;
-	}else{
-		list_tail = client_list_tail(client_list);
+
+	if(!clm->list_head){
 		new_client = malloc(sizeof(struct client_entry));
 		if(!new_client){
 			error_msg(NULL);
 			exit(1);
 		}
-		list_tail->next = new_client;
+		clm->list_head = new_client;	
+	}else{
+		if(client_test_search(name, clm)){
+			printf("[-] Client (%s) already exists.\n", name);
+			return NULL;
+		}
+		new_client = malloc(sizeof(struct client_entry));
+		if(!new_client){
+			error_msg(NULL);
+			exit(1);
+		}
+		if(!clm->list_tail)
+			client_list_tail(clm);
+
+		clm->list_tail->next = new_client;
 		new_client->prev = list_tail;
 	}
-
-	memset(new_client, 0, sizeof(struct client_entry));
+	memset(new_client, 0, NAME_LEN);
 	memcpy(new_client->username, name, NAME_LEN);
 	memcpy(&new_client->clientaddr, clientaddr, sizeof(struct sockaddr_in));
+
+	/*Update list tail and number of clients*/
+	clm->list_tail = new_client;
+	clm->num_clients++;
+	puts("[+] New client added");
+	client_print(new_client);
 
 	return new_client;	
 }
 
 //int client_remove(struct sockaddr_in *clientaddr, struct client_entry *client_list){
-int client_remove(char *name, struct client_entry *client_list){
+int client_remove(char *name, struct _client_manager *clm){
 	struct client_entry *client;
 
 	//if(!clientaddr){
@@ -132,23 +136,33 @@ int client_remove(char *name, struct client_entry *client_list){
 		error_msg(client_err3);
 		return -1;
 	}
-	if(!client_list)
+	if(!clm){
+		error_msg(client_err4);
 		return 0;
+	}
 
 	//client = client_search(clientaddr, client_list);
-	client = client_test_search(name, client_list);
-	if(!client)
+	client = client_test_search(name, clm);
+	if(!client){
+		printf("[-] Client (%s) NOT found.\n", name);
 		return -1;
+	}
 
-	/*Unlink list node*/
+	/*Unlink list node and update clm head or tail if unlinking head or tail*/
 	if(client->next && client->prev){
 		client->next->prev = client->prev;
 		client->prev->next = client->next;
 	}else if(client->next){
+		clm->list_head = client->next;
 		client->next->prev = NULL;
 	}else if(client->prev){
+		clm->list_tail = client->prev;
 		client->prev->next = NULL;
 	}
+	clm->num_clients--;
+	
+	puts("[+] Unlinked client:");
+	client_print(client);
 
 	if(client->hostp)
 		free(client->hostp);
@@ -157,18 +171,20 @@ int client_remove(char *name, struct client_entry *client_list){
 	return 0;
 }
 
-void client_clean(struct client_entry *client_list){
+void client_clean(struct _client_manager *clm){
 	struct client_entry *client;
 	struct client_entry *next_client;
 
-	if(!client_list)
+	if(!clm->list_head)
 		return;
 
-	client = client_list;
+	client = clm->list_head;
 	while(client){
 		if(client->hostp)
 			free(client->hostp);
 		next_client = client->next;
+		puts("[+] Cleaning up client:\n");
+		client_print(client);
 		free(client);
 		client = next_client;
 	}
