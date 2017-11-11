@@ -1,16 +1,18 @@
 #include "server.h"
 
 struct _server_info{
+	char ipaddr_str[256];
+	char portno_str[32];
 	char *hostname;
-	//char ipaddr_str[128];
 	int sockfd;
 	int portno;
-	char portno_str[32];
 	struct sockaddr_in *serveraddr;
 	struct sockaddr_in6 *serveraddr6;
 };
 
 struct _client_info{
+	char ipaddr_str[256];
+	char portno_str[32];
 	struct sockaddr_in clientaddr;
 	struct sockaddr_in6 clientaddr6;
 	struct hostent *hostp;
@@ -65,14 +67,12 @@ void init_server(){
 	switch (p->ai_family){
 		case AF_INET:
 			puts("ai_family IPv4");
-			server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;
-			printf("Using port: %d\n", ntohs(server_info.serveraddr->sin_port));
+			server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;	
 			recvdata_IPv4();
 			break;
 		case AF_INET6:
 			puts("ai_family IPv6");
-			server_info.serveraddr6 = (struct sockaddr_in6*)p->ai_addr;
-			printf("Using port: %d\n", ntohs(server_info.serveraddr6->sin6_port));
+			server_info.serveraddr6 = (struct sockaddr_in6*)p->ai_addr;	
 			recvdata_IPv6();
 			break;
 		default:
@@ -82,18 +82,6 @@ void init_server(){
 	freeaddrinfo(servinfo);
 
 	return;
-}
-
-int _resolve_clientaddr(){
-	char host[1024];
-	char service[32];
-
-	memset(host, 0, 1024);
-	memset(service, 0, 32);
-
-	getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), host, 1024, service, 32, NI_NUMERICHOST | NI_NUMERICSERV);
-	printf("Resolved client info:\n\tHost: %s\n\tService: %s\n\n", host, service);
-	return 1;
 }
 
 int resolve_clientaddr(){
@@ -119,6 +107,8 @@ void recvdata_IPv6(){
 	socklen_t clientlen;
 
 	clientlen = sizeof(client_info.clientaddr6);
+	inet_ntop(AF_INET6, &(server_info.serveraddr6->sin6_addr), server_info.ipaddr_str, INET6_ADDRSTRLEN);
+	printf("[+] Server Info:\n\tIPv6 Addr: %s\n\tPort: %d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr6->sin6_port));
 	printf("Server is now waiting for data...\n");
 	while(1){
 		memset(input, 0, BUFSIZE);
@@ -129,8 +119,13 @@ void recvdata_IPv6(){
 			perror("[?] Issue in recvfrom");
 			continue;
 		}
-		//FIX: finish
+		getnameinfo((struct sockaddr*)&client_info.clientaddr6, sizeof(struct sockaddr), 
+			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
+		printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
+		printf("Data (%d):\t%s\n", n, input);
 	}
+
+	return;
 }
 
 void recvdata_IPv4(){
@@ -139,6 +134,8 @@ void recvdata_IPv4(){
 	socklen_t clientlen;
 
 	clientlen = sizeof(client_info.clientaddr);
+	inet_ntop(AF_INET, &(server_info.serveraddr->sin_addr), server_info.ipaddr_str, INET_ADDRSTRLEN);
+	printf("[+] Server Info:\n\tIPv4 Addr: %s\n\tPort: %d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr->sin_port));
 	printf("Server is now waiting for data...\n");
 	while(1){
 		memset(input, 0, BUFSIZE);
@@ -149,10 +146,11 @@ void recvdata_IPv4(){
 			perror("[?] Issue in revcfrom");
 			continue;
 		}
-		if(_resolve_clientaddr() == 0){
-			printf("Server received data from:\t%s (%s : %d)\n", client_info.hostp->h_name, client_info.hostaddrp, client_info.portno);
-			printf("Data (%d):\t%s\n", n, input);
-		}
+
+		getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), 
+			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
+		printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
+		printf("Data (%d):\t%s\n", n, input);
 	}
 
 	return;
@@ -178,60 +176,6 @@ int main(int argc, char *argv[]){
 	memcpy(server_info.portno_str, argv[2], n);
 	server_info.hostname = argv[1];
 	init_server();
-	/*
-	if((rv = getaddrinfo(server_info.hostname, argv[2], &hints, &servinfo)) != 0){
-		fprintf(stderr, "in getaddrinfo: %s\n", gai_strerror(rv));
-		exit(1);
-	}
-	printf("Host: %s\n", server_info.hostname);
-	optval = 1;
-	for(p = servinfo; p != NULL; p = p->ai_next){
-		if((server_info.sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1){
-			perror("[?] Error in socket");
-			continue;
-		}
-		setsockopt(server_info.sockfd, SOL_SOCKET, SO_REUSEADDR, (const void*)&optval, sizeof(int));
-		if(bind(server_info.sockfd, p->ai_addr, p->ai_addrlen) == -1){
-			close(server_info.sockfd);
-			perror("[?] Error in bind");
-			continue;
-		}
-		break;
-	}
-	if(p == NULL){
-		fprintf(stderr, "[!] Failed to bind socket\n");
-		exit(1);
-	}
-	//inet_ntop(AF_INET, &server_info.serveraddr.sin_addr, server_info.ipaddr_str, INET_ADDRSTRLEN);
-	inet_ntop(p->ai_family, p->ai_addr->sa_data, server_info.ipaddr_str, 128);
-	switch (p->ai_family){
-		case AF_INET:
-			puts("AI Family is IPv4");
-			break;
-		case AF_INET6:
-			puts("AI Family is IPv6");
-			break;
-		default:
-			puts("AI Family is invalid");
-	}
-	ptr = &((struct sockaddr_in6 *)p->ai_addr)->sin6_addr;
-	inet_ntop(p->ai_family, ptr, server_info.ipaddr_str, 100);
-	recvdata();
-	
-	server_info.sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	if(server_info.sockfd < 0)
-		error("[!] Error opening socket");
-
-	optval = 1;
-	setsockopt(server_info.sockfd, SOL_SOCKET, SO_REUSEADDR, (const void*)&optval, sizeof(int));
-	server_info.serveraddr.sin_family = AF_INET;
-	server_info.serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	server_info.serveraddr.sin_port = htons((unsigned short)server_info.portno);
-	if(bind(server_info.sockfd, (struct sockaddr *)&server_info.serveraddr, sizeof(struct sockaddr_in)) < 0)
-		error("[!] Error on binding");
-	//inet_ntop(AF_INET, &server_info.serveraddr.sin_addr, server_info.ipaddr_str, INET_ADDRSTRLEN);
-	recvdata();
-	*/
 
 	return 0;
 }
