@@ -7,8 +7,31 @@ struct _server_info{
 	char *hostname;
 };
 
+struct req_login login_pkt;
+
 struct _server_info server_info;
 int sockfd;
+
+void send_data();
+
+void send_login_test(){
+	char test_name[]="John";
+	char data[sizeof(struct req_login)];
+	int n, serverlen;
+
+	serverlen = sizeof(struct sockaddr);
+	memset(&login_pkt, 0, sizeof(struct req_login));
+	login_pkt.type_id = REQ_LOGIN;
+	strncpy(login_pkt.username, test_name, NAME_LEN);
+	memcpy(data, &login_pkt, sizeof(struct req_login));
+	n = sendto(sockfd, data, sizeof(struct req_login), 0, (struct sockaddr *)&server_info.serveraddr, serverlen);
+        if(n < 0){
+        	perror("[!] Error in sendto");
+        	exit(1);
+	}
+	puts("Login sent");
+	send_data();
+}
 
 void send_data(){
 	char input[BUFSIZE];
@@ -22,12 +45,13 @@ void send_data(){
 		fgets(input, BUFSIZE, stdin);
 		if(!strncmp(input, "/exit", 5))
 			exit(0);
+		printf("Sending: %s\n", input);
 		n = sendto(sockfd, input, BUFSIZE, 0, (struct sockaddr *)&server_info.serveraddr, serverlen);
 		if(n < 0){
 			perror("[!] Error in sendto");
 			exit(1);
 		}
-		puts("Message sent.");
+		printf("Message sent (size: %d)\n", n);
 	}
 
 	return;
@@ -59,6 +83,6 @@ int main(int argc, char *argv[]){
 	server_info.serveraddr.sin_family = AF_INET;
 	bcopy((char *)server_info.server->h_addr, (char *)&server_info.serveraddr.sin_addr.s_addr, server_info.server->h_length);
 	server_info.serveraddr.sin_port = htons(server_info.portno);
-	send_data();
+	send_login_test();
 	return 0;
 }

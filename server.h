@@ -14,6 +14,7 @@ struct _client_manager{
 	int num_clients;
 };
 
+/*client_manager.c function prototypes*/
 void client_print(struct client_entry *client);
 struct client_entry *client_search(struct sockaddr_in *clientaddr, struct client_entry *first);
 struct client_entry *client_init_list();
@@ -23,5 +24,6 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 int client_remove(char *name, struct _client_manager *clm);
 void client_clean(struct _client_manager *clm);
 
+/*server.c function prototypes*/
 void recvdata_IPv4();
 void recvdata_IPv6();

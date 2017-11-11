@@ -131,6 +131,7 @@ void recvdata_IPv6(){
 void recvdata_IPv4(){
 	char input[BUFSIZE];
 	int n;
+	rid_t type;
 	socklen_t clientlen;
 
 	clientlen = sizeof(client_info.clientaddr);
@@ -151,6 +152,10 @@ void recvdata_IPv4(){
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
 		printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
 		printf("Data (%d):\t%s\n", n, input);
+		memcpy(&type, input, sizeof(rid_t));
+		if(type == REQ_LOGIN){
+			printf("Login request from: %s\n", &input[4]);
+		}
 	}
 
 	return;
