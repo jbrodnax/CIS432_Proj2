@@ -22,3 +22,6 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 //int client_remove(struct sockaddr_in *clientaddr, struct client_entry *client_list);
 int client_remove(char *name, struct _client_manager *clm);
 void client_clean(struct _client_manager *clm);
+
+void recvdata_IPv4();
+void recvdata_IPv6();
