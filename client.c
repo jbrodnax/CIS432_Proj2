@@ -1,4 +1,7 @@
 #include "duckchat.h"
+#include "raw.h"
+
+#define STDIN 0
 
 struct _server_info{
 	int portno;
@@ -25,7 +28,7 @@ struct _client_info client_info;
 char output[BUFSIZE+STR_PADD];
 size_t output_size;
 int sockfd;
-fd_set set;
+fd_set fds;
 /*Just for testing*/
 char channel_name[]="Common";
 
@@ -117,6 +120,7 @@ void handle_user_input(char *input, int n, char **argv){
 		if(resolve_cmd(input) == REQ_LOGOUT){
 			free(argv);
 			free(input);
+			cooked_mode();
 			exit(EXIT_SUCCESS);
 		}
 	}else{
@@ -131,7 +135,7 @@ void handle_user_input(char *input, int n, char **argv){
 
 void user_prompt(){
 	char *input;
-	int c;
+	char c;
 	char **argv;
 	int n;
 
@@ -158,27 +162,34 @@ void user_prompt(){
 	n = 0;
 	write(1, "> ", 2);
 	while(1){
-		FD_ZERO(&set);
-		FD_SET(sockfd, &set);
-		FD_SET(STDIN_FILENO, &set);
-		if(select(FD_SETSIZE, &set, NULL, NULL, NULL) < 0){
+		//fflush(stdout);
+		FD_ZERO(&fds);
+		FD_SET(sockfd, &fds);
+		FD_SET(STDIN, &fds);
+		if(select(sockfd+1, &fds, NULL, NULL, NULL) < 0){
 			perror("Error in select");
 			exit(EXIT_FAILURE);
 		}
-		if(FD_ISSET(STDIN_FILENO, &set)){
-			read(STDIN_FILENO, &c, 1);
-			if(n < BUFSIZE-1){
-				memcpy(&input[n], &c, 1);
-			}else if(c == 0x0a || c == 0x00){
-				memcpy(&input[n], &c, 1);
+		//puts("Selected returned");
+		if(FD_ISSET(STDIN, &fds)){	
+			//read(STDIN, &c, 1);
+			//printf("Got char: %c\n", c);
+			c = getchar();
+			if(n < BUFSIZE-1){	
+				input[n] = c;
+				write(1, &c, 1);
+			}if(c == '\n' || c == '\0'){
+				//input[n] = c;
 				n++;
+				puts("handling input");
 				handle_user_input(input, n, argv);
-			}else{
+				n = 0;
+			}else if(n >= BUFSIZE-1){
 				write(1, "\b", 1);
 			}
 			n++;
 		}
-		if(FD_ISSET(sockfd, &set)){
+		if(FD_ISSET(sockfd, &fds)){
 			//read data from socket
 			printf("Ready to read from udp socket\n");
 		}
@@ -262,7 +273,11 @@ int main(int argc, char *argv[]){
 	bcopy((char *)server_info.server->h_addr, (char *)&server_info.serveraddr.sin_addr.s_addr, server_info.server->h_length);
 	server_info.serveraddr.sin_port = htons(server_info.portno);
 	printf("Client Info:\n\tConnecting to (%s:%d)\n\tLogin as (%s)\n", server_info.hostname, ntohs(server_info.serveraddr.sin_port), client_info.username);
-	if(send_login() == 0){
+	if(raw_mode() == -1){
+		fprintf(stderr, "[!] Error: raw_mode failed\n");
+		exit(EXIT_FAILURE);
+	}
+	if(send_login() == 0){	
 		user_prompt();
 	}
 
