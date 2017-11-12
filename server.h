@@ -14,6 +14,19 @@ struct _client_manager{
 	int num_clients;
 };
 
+struct channel_entry{
+	char channel_name[NAME_LEN+STR_PADD];
+	struct client_entry *client_list[MAX_CHANNELCLIENTS];
+	struct channel_entry *next;
+	struct channel_entry *prev;
+};
+
+struct _channel_manager{
+	struct channel_entry *list_head;
+	struct channel_entry *list_tail;
+	int num_channels;
+};
+
 /*client_manager.c function prototypes*/
 void client_print(struct client_entry *client);
 struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _client_manager *clm);

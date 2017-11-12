@@ -8,7 +8,7 @@ all: server client
 client: client.c raw.c
 	$(CC) client.c raw.c $(CFLAGS) -o client
 
-server: server.c client_manager.c 
+server: server.c client_manager.c
 	$(CC) server.c client_manager.c $(CFLAGS) -o server
 
 clean:

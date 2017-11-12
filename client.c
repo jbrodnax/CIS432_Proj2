@@ -135,6 +135,7 @@ void user_prompt(){
 	char *input;
 	char c;
 	char **argv;
+	char dest_bckspace[]="\b \b";
 	int n;
 
 	input = malloc(BUFSIZE+STR_PADD);
@@ -164,8 +165,12 @@ void user_prompt(){
 			exit(EXIT_FAILURE);
 		}	
 		if(FD_ISSET(STDIN, &fds)){	
-			c = getchar();
-			if(n < BUFSIZE-1){
+			c = getchar();	
+			if(c == 0x7f && n > 0){
+				n--;
+				input[n] = 0;
+				write(1, dest_bckspace, strlen(dest_bckspace));
+			}else if(n < BUFSIZE-1){
 				input[n] = c;
 				write(1, &c, 1);
 				n++;
