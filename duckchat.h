@@ -42,6 +42,7 @@
 #define RSP_WHO		2
 #define RSP_ERR		3
 
+#define RET_FAILURE	99
 /*Request/Response identifier types length*/
 typedef uint32_t rid_t;
 

@@ -25,29 +25,9 @@ struct _client_info client_info;
 char output[BUFSIZE+STR_PADD];
 size_t output_size;
 int sockfd;
+fd_set set;
 /*Just for testing*/
 char channel_name[]="Common";
-
-int send_data();
-
-void send_login_test(){
-	char test_name[]="John";
-	char data[sizeof(struct _req_login)];
-	int n, serverlen;
-
-	serverlen = sizeof(struct sockaddr);
-	memset(&req_login, 0, sizeof(struct _req_login));
-	req_login.type_id = REQ_LOGIN;
-	strncpy(req_login.username, test_name, NAME_LEN);
-	memcpy(data, &req_login, sizeof(struct _req_login));
-	n = sendto(sockfd, data, sizeof(struct _req_login), 0, (struct sockaddr *)&server_info.serveraddr, serverlen);
-        if(n < 0){
-        	perror("[!] Error in sendto");
-        	exit(1);
-	}
-	puts("Login sent");
-	send_data();
-}
 
 int send_data(){
 	int n, serverlen;
@@ -105,22 +85,53 @@ rid_t build_request(rid_t type, int argc, char **argv){
 		default:
 			break;
 	}
-	return REQ_INVALID;
+	return RET_FAILURE;
 }
 
 rid_t resolve_cmd(char *input){
 	if(!strncmp(input, "/exit", 5)){
 		//FIX: check return values of build_request and send_data
-		build_request(REQ_LOGOUT, 0, NULL);
-		send_data();
-		return REQ_LOGOUT;
-	}else{
-		return RSP_ERR;
+		if(build_request(REQ_LOGOUT, 0, NULL) == REQ_LOGOUT){
+			send_data();
+			return REQ_LOGOUT;
+		}
 	}
+
+	return RET_FAILURE;
+}
+
+void handle_user_input(char *input, int n, char **argv){
+	int i = 0;
+	int is_cmd = 0;
+
+	while(i < n){
+		if(input[n] == 0x2f && is_cmd == 0){
+			is_cmd = 1;
+		}else if(input[n] < 0x20 || input[n] > 0x7f){
+			input[n] = 0x00;
+		}
+		i++;
+	}
+
+	if(is_cmd == 1){
+		if(resolve_cmd(input) == REQ_LOGOUT){
+			free(argv);
+			free(input);
+			exit(EXIT_SUCCESS);
+		}
+	}else{
+		build_request(REQ_SAY, 2, argv);
+		send_data();
+	}
+	memset(input, 0, (BUFSIZE+STR_PADD));
+	write(1, "> ", 2);
+
+	return;
 }
 
 void user_prompt(){
 	char *input;
+	int c;
 	char **argv;
 	int n;
 
@@ -139,12 +150,45 @@ void user_prompt(){
 	argv[0] = channel_name;
 	argv[1] = input;
 
+	//FD_ZERO(&set);
+	//FD_SET(sockfd, &set);
+	//FD_SET(stdin, &set);
+
+	memset(input, 0, BUFSIZE+STR_PADD);
+	n = 0;
+	write(1, "> ", 2);
+	while(1){
+		FD_ZERO(&set);
+		FD_SET(sockfd, &set);
+		FD_SET(STDIN_FILENO, &set);
+		if(select(FD_SETSIZE, &set, NULL, NULL, NULL) < 0){
+			perror("Error in select");
+			exit(EXIT_FAILURE);
+		}
+		if(FD_ISSET(STDIN_FILENO, &set)){
+			read(STDIN_FILENO, &c, 1);
+			if(n < BUFSIZE-1){
+				memcpy(&input[n], &c, 1);
+			}else if(c == 0x0a || c == 0x00){
+				memcpy(&input[n], &c, 1);
+				n++;
+				handle_user_input(input, n, argv);
+			}else{
+				write(1, "\b", 1);
+			}
+			n++;
+		}
+		if(FD_ISSET(sockfd, &set)){
+			//read data from socket
+			printf("Ready to read from udp socket\n");
+		}
+	}
+	/*
 	while(1){	
 		memset(input, 0, BUFSIZE+STR_PADD);
 		write(1, "> ", 2);
 
 		n=0;
-		//argv[0] = session->_active_channel->name;
 		while(n < BUFSIZE){	
 			if((read(0, &input[n], 1)) < 1)
 				break;
@@ -159,13 +203,10 @@ void user_prompt(){
 				break;
 		}else{	
 			build_request(REQ_SAY, 2, argv);
-			send_data();
-			//send_channel_request(_OUT_SAY);
+			send_data();	
 		}
 	}
-
-	free(argv);
-	free(input);
+	*/
 
 	return;
 }
