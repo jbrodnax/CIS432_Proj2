@@ -6,6 +6,11 @@ char client_err3[]="client_remove received NULL clientaddr ptr.";
 char client_err4[]="client_list is empty.";
 
 char channel_err1[]="channel_create received null argument.";
+char channel_err2[]=".";
+char channel_err3[]="channel_add_client received null argument,";
+char channel_err4[]="max number of clients on channel reached.";
+char channel_err5[]="channel_remove_client received null argument.";
+char channel_err6[]="no clients are in this channel.";
 
 void error_msg(char *err_msg){
 	if(!err_msg){
@@ -322,6 +327,62 @@ void channel_clean(struct _channel_manager *chm){
 	puts("[!] Channel list is clean.");
 	return;
 }
+
+int channel_add_client(struct client_entry *client, struct channel_entry *channel){
+
+	if(!client || !channel){
+		error_msg(channel_err3);
+		return -1;
+	}
+	/*Max number of clients per channel is actually 1 less than defined since the last array index needs to remain 0 for shifting during removal*/
+	if(channel->num_clients >= MAX_CHANNELCLIENTS-1){
+		error_msg(channel_err4);
+		return -1;
+	}
+
+	channel->client_list[channel->num_clients] = client;
+	channel->num_clients++;
+
+	return 0;
+}
+
+int channel_remove_client(struct client_entry *client, struct channel_entry *channel){
+	struct client_entry *current;
+	int i;
+	int n = 0;
+
+	if(!client || !channel){
+		error_msg(channel_err5);
+		return -1;
+	}
+	if(channel->num_clients < 1){
+		error_msg(channel_err6);
+		return -1;
+	}
+
+	while(n < channel->num_clients){
+		current = channel->client_list[n];
+		if(current->clientaddr.sin_addr.s_addr == client->clientaddr.sin_addr.s_addr){
+			if(current->clientaddr.sin_port == client->clientaddr.sin_port)
+				break;
+		}
+		n++;
+	}
+	if(n < channel->num_clients){
+		while(n < channel->num_clients){
+			memcpy(channel->client_list[n], channel->client_list[n+1], sizeof(struct client_entry *));
+			n++;
+		}
+	}
+
+	return 0;
+}
+
+
+
+
+
+
 
 
 
