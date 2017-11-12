@@ -38,22 +38,17 @@ struct client_entry *client_test_search(char *name, struct _client_manager *clm)
 	return NULL;
 }
 
-struct client_entry *client_search(struct sockaddr_in *clientaddr, struct client_entry *first){
+struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _client_manager *clm){
 /*For now, searches for client based on ip addr and port # by iterating through client list*/
 	struct client_entry *client;
-	unsigned long c_addr;
-	unsigned short c_port;
 
-	if(!clientaddr || !first)
+	if(!clientaddr || !clm)
 		return NULL;
 
-	memcpy(&c_addr, &clientaddr->sin_addr.s_addr, sizeof(unsigned long));
-	c_port = clientaddr->sin_port;
-	client = first;
-
+	client = clm->list_head;
 	while(client){
-		if(c_addr == client->clientaddr.sin_addr.s_addr){
-			if(c_port == client->clientaddr.sin_port)
+		if(clientaddr->sin_addr.s_addr == client->clientaddr.sin_addr.s_addr){
+			if(clientaddr->sin_port == client->clientaddr.sin_port)
 				return client;
 		}
 		client = client->next;
@@ -99,10 +94,10 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 		}
 		clm->list_head = new_client;	
 	}else{
-		if(client_test_search(name, clm)){
+		/*if(client_test_search(name, clm)){
 			printf("[-] Client (%s) already exists.\n", name);
 			return NULL;
-		}
+		}*/
 		new_client = malloc(sizeof(struct client_entry));
 		if(!new_client){
 			error_msg(NULL);
@@ -121,30 +116,28 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 	/*Update list tail and number of clients*/
 	clm->list_tail = new_client;
 	clm->num_clients++;
-	//puts("[+] New client added");
-	//client_print(new_client);
+	puts("[+] New client added");
+	client_print(new_client);
 
 	return new_client;	
 }
 
 //int client_remove(struct sockaddr_in *clientaddr, struct client_entry *client_list){
-int client_remove(char *name, struct _client_manager *clm){
-	struct client_entry *client;
+int client_remove(struct client_entry *client, struct _client_manager *clm){
+	//struct client_entry *client;
 
 	//if(!clientaddr){
-	if(!name){
+	if(!client){
 		error_msg(client_err3);
 		return -1;
 	}
 	if(!clm){
 		error_msg(client_err4);
-		return 0;
+		return -1;
 	}
 
 	//client = client_search(clientaddr, client_list);
-	client = client_test_search(name, clm);
-	if(!client)	
-		return -1;
+	//client = client_test_search(name, clm);
 
 	/*Unlink list node and update clm head or tail if unlinking head or tail*/
 	if(client->next && client->prev){

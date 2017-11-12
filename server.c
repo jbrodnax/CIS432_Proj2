@@ -43,6 +43,7 @@ void init_server(){
 	int rv, optval;
 	void *ptr;
 
+	memset(&client_manager, 0, sizeof(struct _client_manager));
 	memset(&hints, 0, sizeof(hints));
 	/*Init server's addr info for either IPv6 or IPv4, UDP socket, and default system's IP addr*/
 	hints.ai_family = AF_INET;//AF_UNSPEC;
@@ -94,9 +95,20 @@ void init_server(){
 }
 
 rid_t handle_request(char *data){
+	struct client_entry *client;
 	rid_t type;
 
+	/*Check if request came from authenticated client*/
 	memcpy(&type, data, sizeof(rid_t));
+	client = client_search(&client_info.clientaddr, &client_manager);
+	if(client == NULL && type != REQ_LOGIN){
+		printf("[?] Issue: received non-login request from non-authenticated client\n");
+		return REQ_INVALID;
+	}else if(client != NULL && type == REQ_LOGIN){
+		printf("[?] Issue: received login request from already authenticated client\n");
+		return REQ_INVALID;
+	}
+
 	switch(type){
 		case REQ_LOGIN:
 			if(!(req_login = malloc(sizeof(struct _req_login)))){
@@ -108,10 +120,12 @@ rid_t handle_request(char *data){
 			//FIX: remove the -1 from NAME_LEN once client login is implemented
 			memcpy(req_login->username, &data[sizeof(rid_t)], NAME_LEN-1);
 			printf("[>] Login request from: (%s)\n", req_login->username);
+			client_add(req_login->username, &client_info.clientaddr, &client_manager);
 			free(req_login);
 			return REQ_LOGIN;
 		case REQ_LOGOUT:
-			break;
+			client_remove(client, &client_manager);
+			return REQ_LOGOUT;
 		case REQ_JOIN:
 			break;
 		case REQ_LEAVE:
@@ -125,7 +139,7 @@ rid_t handle_request(char *data){
 			req_say->type_id = REQ_SAY;
 			memcpy(req_say->channel, &data[sizeof(rid_t)], NAME_LEN-1);
 			memcpy(req_say->text, &data[(sizeof(rid_t)+NAME_LEN)], TEXT_LEN-1);
-			printf("[>] Say request for channel: (%s)\n\tMessage: %s\n", req_say->channel, req_say->text);
+			printf("[>] Say request from (%s) for channel: (%s)\n\tMessage: %s\n", client->username, req_say->channel, req_say->text);
 			free(req_say);
 			return REQ_SAY;
 		case REQ_LIST:
@@ -137,6 +151,8 @@ rid_t handle_request(char *data){
 		default:
 			break;		
 	}
+
+	return REQ_INVALID;
 }
 
 void recvdata_IPv6(){

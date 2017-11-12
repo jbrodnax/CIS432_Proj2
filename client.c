@@ -48,31 +48,7 @@ void send_login_test(){
 	puts("Login sent");
 	send_data();
 }
-/*
-void send_data(){
-	char input[BUFSIZE];
-	int serverlen;
-	int n;
 
-	serverlen = sizeof(struct sockaddr);
-	while(1){
-		memset(input, 0, BUFSIZE);
-		write(1, "> ", 2);
-		fgets(input, BUFSIZE, stdin);
-		if(!strncmp(input, "/exit", 5))
-			exit(0);
-		printf("Sending: %s\n", input);
-		n = sendto(sockfd, input, BUFSIZE, 0, (struct sockaddr *)&server_info.serveraddr, serverlen);
-		if(n < 0){
-			perror("[!] Error in sendto");
-			exit(1);
-		}
-		printf("Message sent (size: %d)\n", n);
-	}
-
-	return;
-}
-*/
 int send_data(){
 	int n, serverlen;
 
@@ -103,7 +79,11 @@ rid_t build_request(rid_t type, int argc, char **argv){
 			memcpy(output, &req_login, output_size);
 			return REQ_LOGIN;
 		case REQ_LOGOUT:
-			break;
+			output_size = sizeof(struct _req_logout);
+			memset(&req_logout, 0, output_size);
+			req_logout.type_id = REQ_LOGOUT;
+			memcpy(output, &req_logout, output_size);
+			return REQ_LOGOUT;
 		case REQ_JOIN:
 			break;
 		case REQ_LEAVE:
@@ -129,10 +109,14 @@ rid_t build_request(rid_t type, int argc, char **argv){
 }
 
 rid_t resolve_cmd(char *input){
-	if(!strncmp(input, "/exit", 5))
+	if(!strncmp(input, "/exit", 5)){
+		//FIX: check return values of build_request and send_data
+		build_request(REQ_LOGOUT, 0, NULL);
+		send_data();
 		return REQ_LOGOUT;
-	else
+	}else{
 		return RSP_ERR;
+	}
 }
 
 void user_prompt(){
