@@ -108,10 +108,10 @@ void handle_user_input(char *input, int n, char **argv){
 	int is_cmd = 0;
 
 	while(i < n){
-		if(input[n] == 0x2f && is_cmd == 0){
+		if(input[i] == 0x2f && is_cmd == 0){
 			is_cmd = 1;
-		}else if(input[n] < 0x20 || input[n] > 0x7f){
-			input[n] = 0x00;
+		}else if(input[i] < 0x20 || input[i] > 0x7f){
+			input[i] = 0x00;
 		}
 		i++;
 	}
@@ -127,8 +127,6 @@ void handle_user_input(char *input, int n, char **argv){
 		build_request(REQ_SAY, 2, argv);
 		send_data();
 	}
-	memset(input, 0, (BUFSIZE+STR_PADD));
-	write(1, "> ", 2);
 
 	return;
 }
@@ -154,70 +152,44 @@ void user_prompt(){
 	argv[0] = channel_name;
 	argv[1] = input;
 
-	//FD_ZERO(&set);
-	//FD_SET(sockfd, &set);
-	//FD_SET(stdin, &set);
-
 	memset(input, 0, BUFSIZE+STR_PADD);
 	n = 0;
 	write(1, "> ", 2);
 	while(1){
-		//fflush(stdout);
 		FD_ZERO(&fds);
 		FD_SET(sockfd, &fds);
 		FD_SET(STDIN, &fds);
 		if(select(sockfd+1, &fds, NULL, NULL, NULL) < 0){
 			perror("Error in select");
 			exit(EXIT_FAILURE);
-		}
-		//puts("Selected returned");
+		}	
 		if(FD_ISSET(STDIN, &fds)){	
-			//read(STDIN, &c, 1);
-			//printf("Got char: %c\n", c);
 			c = getchar();
-			if(n < BUFSIZE-1){	
+			if(n < BUFSIZE-1){
 				input[n] = c;
 				write(1, &c, 1);
-			}if(c == '\n' || c == '\0'){
-				//input[n] = c;
 				n++;
-				puts("handling input");
-				handle_user_input(input, n, argv);
-				n = 0;
+				if(c == '\n' || c == '\0'){
+					handle_user_input(input, n, argv);
+					n = 0;
+					memset(input, 0, BUFSIZE+STR_PADD);
+					write(1, "> ", 2);
+				}
 			}else if(n >= BUFSIZE-1){
-				write(1, "\b", 1);
+				if(c == '\n' || c == '\0'){
+					handle_user_input(input, n, argv);
+					n = 0;
+					memset(input, 0, BUFSIZE+STR_PADD);
+					write(1, "> ", 2);
+				}
 			}
-			n++;
+			
 		}
 		if(FD_ISSET(sockfd, &fds)){
 			//read data from socket
 			printf("Ready to read from udp socket\n");
 		}
 	}
-	/*
-	while(1){	
-		memset(input, 0, BUFSIZE+STR_PADD);
-		write(1, "> ", 2);
-
-		n=0;
-		while(n < BUFSIZE){	
-			if((read(0, &input[n], 1)) < 1)
-				break;
-			if(input[n] == 0x0a || input[n] == 0x00)	
-				break;
-			n++;	
-		}
-		//FIX: Hardcoded channel name
-		argv[0] = channel_name;
-		if(input[0] == 0x2f){
-			if(resolve_cmd(input) == REQ_LOGOUT)
-				break;
-		}else{	
-			build_request(REQ_SAY, 2, argv);
-			send_data();	
-		}
-	}
-	*/
 
 	return;
 }
