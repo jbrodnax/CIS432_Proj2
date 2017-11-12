@@ -93,23 +93,6 @@ void init_server(){
 	return;
 }
 
-int resolve_clientaddr(){
-
-	client_info.hostp = gethostbyaddr((const char*)&client_info.clientaddr.sin_addr.s_addr, sizeof(client_info.clientaddr.sin_addr.s_addr), AF_INET);
-	if(client_info.hostp == NULL){
-		perror("[?] Issue on gethostbyaddr");
-		return -1;
-	}
-	client_info.hostaddrp = inet_ntoa(client_info.clientaddr.sin_addr);
-	if(client_info.hostaddrp == NULL){
-		perror("[?] Issue in inet_ntoa");
-		return -1;
-	}
-	client_info.portno = ntohs(client_info.clientaddr.sin_port);
-
-	return 0;
-}
-
 rid_t handle_request(char *data){
 	rid_t type;
 
@@ -177,7 +160,7 @@ void recvdata_IPv6(){
 		getnameinfo((struct sockaddr*)&client_info.clientaddr6, sizeof(struct sockaddr), 
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
 		printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
-		//printf("Data (%d):\t%s\n", n, input);
+		handle_request(input);	
 	}
 
 	return;
@@ -206,11 +189,7 @@ void recvdata_IPv4(){
 		getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), 
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
 		printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
-		//printf("Data (%d):\t%s\n", n, input);
-		memcpy(&type, input, sizeof(rid_t));
-		if(type == REQ_LOGIN){
-			printf("Login request from: %s\n", &input[4]);
-		}
+		handle_request(input);
 	}
 
 	return;

@@ -219,6 +219,7 @@ int main(int argc, char *argv[]){
 	memset(&client_info, 0, sizeof(struct _client_info));
 	server_info.hostname = argv[1];
 	server_info.portno = atoi(argv[2]);
+	strncpy(client_info.username, argv[3], n);
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if(sockfd < 0){
@@ -235,7 +236,7 @@ int main(int argc, char *argv[]){
 	server_info.serveraddr.sin_family = AF_INET;
 	bcopy((char *)server_info.server->h_addr, (char *)&server_info.serveraddr.sin_addr.s_addr, server_info.server->h_length);
 	server_info.serveraddr.sin_port = htons(server_info.portno);
-	printf("Client Info:\n\tConnecting to (%s:%d)\n\tLogin as (%s)\n", server_info.hostname, ntohs(server_info.serveraddr.sin_port));
+	printf("Client Info:\n\tConnecting to (%s:%d)\n\tLogin as (%s)\n", server_info.hostname, ntohs(server_info.serveraddr.sin_port), client_info.username);
 	if(send_login() == 0){
 		user_prompt();
 	}
