@@ -30,13 +30,30 @@ struct _req_who* req_who;
 struct _req_alive* req_alive;
 
 struct _client_manager client_manager;
+struct _channel_manager channel_manager;
 struct _server_info server_info;
 struct _client_info client_info;
 struct addrinfo hints, *servinfo, *p;
 
+char init_channelname[]="Common";
+
 void error(char *msg){
 	perror(msg);
 	exit(1);
+}
+
+void test_chm(){
+	struct channel_entry *ch;
+	if(!channel_create(init_channelname, &channel_manager)){
+		fprintf(stderr, "[!] Error: Channel creation of (%s) failed.");
+		exit(EXIT_FAILURE);
+	}else{
+		ch = channel_search(init_channelname, &channel_manager);
+		if(ch)
+			channel_remove(ch, &channel_manager);
+		else
+			exit(EXIT_FAILURE);
+	}
 }
 
 void init_server(){
@@ -44,6 +61,7 @@ void init_server(){
 	void *ptr;
 
 	memset(&client_manager, 0, sizeof(struct _client_manager));
+	memset(&channel_manager, 0, sizeof(struct _channel_manager));
 	memset(&hints, 0, sizeof(hints));
 	/*Init server's addr info for either IPv6 or IPv4, UDP socket, and default system's IP addr*/
 	hints.ai_family = AF_INET;//AF_UNSPEC;
@@ -74,6 +92,8 @@ void init_server(){
 		fprintf(stderr, "[!] Failed to bind socket\n");
 		exit(1);
 	}
+	/*Create Common channel*/
+	test_chm();
 	switch (p->ai_family){
 		case AF_INET:
 			puts("ai_family IPv4");

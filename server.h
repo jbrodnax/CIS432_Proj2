@@ -17,6 +17,7 @@ struct _client_manager{
 struct channel_entry{
 	char channel_name[NAME_LEN+STR_PADD];
 	struct client_entry *client_list[MAX_CHANNELCLIENTS];
+	int num_clients;
 	struct channel_entry *next;
 	struct channel_entry *prev;
 };
@@ -35,6 +36,13 @@ struct client_entry *client_list_tail(struct _client_manager *clm);
 struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, struct _client_manager *clm);
 int client_remove(struct client_entry *client, struct _client_manager *clm);
 void client_clean(struct _client_manager *clm);
+struct channel_entry *channel_search(char *name, struct _channel_manager *chm);
+struct channel_entry *channel_list_tail(struct _channel_manager *chm);
+struct channel_entry *channel_create(char *name, struct _channel_manager *chm);
+int channel_remove(struct channel_entry *channel, struct _channel_manager *chm);
+void channel_clean(struct _channel_manager *chm);
+int channel_add_client(struct client_entry *client, struct channel_entry *channel);
+int channel_remove_client(struct client_entry *client, struct channel_entry *channel);
 
 /*server.c function prototypes*/
 void recvdata_IPv4();

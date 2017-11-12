@@ -265,7 +265,7 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm){
 	/*Update list tail and number of clients*/
 	chm->list_tail = new_channel;
 	chm->num_channels++;
-	//puts("[+] New client added");
+	puts("[+] New channel added");
 	//client_print(new_client);
 
 	return new_channel;
