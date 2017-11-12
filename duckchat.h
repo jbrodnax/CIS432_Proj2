@@ -35,7 +35,7 @@
 #define REQ_LIST	5
 #define REQ_WHO		6
 #define REQ_ALIVE	7
-
+#define REQ_INVALID	8	//This is not used as a request type, just as a return value for invalid client requests
 /*Define response types sent from server to client*/
 #define RSP_SAY		0
 #define RSP_LIST	1
@@ -45,66 +45,66 @@
 /*Request/Response identifier types length*/
 typedef uint32_t rid_t;
 
-struct __attribute__((packed)) req_login {
+struct __attribute__((packed)) _req_login {
 	rid_t type_id;
 	char username[NAME_LEN];
 };
 
-struct __attribute__((packed)) req_logout {
+struct __attribute__((packed)) _req_logout {
 	rid_t type_id;
 };
 
-struct __attribute__((packed)) req_join {
-	rid_t type_id;
-	char channel[NAME_LEN];
-};
-
-struct __attribute__((packed)) req_leave {
+struct __attribute__((packed)) _req_join {
 	rid_t type_id;
 	char channel[NAME_LEN];
 };
 
-struct __attribute__((packed)) req_say {
+struct __attribute__((packed)) _req_leave {
+	rid_t type_id;
+	char channel[NAME_LEN];
+};
+
+struct __attribute__((packed)) _req_say {
 	rid_t type_id;
 	char channel[NAME_LEN];
 	char text[TEXT_LEN];
 };
 
-struct __attribute__((packed)) req_list {
+struct __attribute__((packed)) _req_list {
 	rid_t type_id;
 };
 
-struct __attribute__((packed)) req_who {
+struct __attribute__((packed)) _req_who {
 	rid_t type_id;
 	char channel[NAME_LEN];
 };
 
-struct __attribute__((packed)) req_alive {
+struct __attribute__((packed)) _req_alive {
 	rid_t type_id;
 };
 
 /*Struct defs for server responses*/
-struct __attribute__((packed)) rsp_say {
+struct __attribute__((packed)) _rsp_say {
 	rid_t type_id;
 	char channel[NAME_LEN];
 	char username[NAME_LEN];
 	char text[TEXT_LEN];
 };
 
-struct __attribute__((packed)) rsp_list {
+struct __attribute__((packed)) _rsp_list {
 	rid_t type_id;
 	rid_t num_channels;
 	char channel_list[(NAME_LEN*LIST_LEN)];
 };
 
-struct __attribute__((packed)) rsp_who {
+struct __attribute__((packed)) _rsp_who {
 	rid_t type_id;
 	rid_t num_users;
 	char channel[NAME_LEN];
 	char users[(NAME_LEN*WHO_LEN)];
 };
 
-struct __attribute__((packed)) rsp_err {
+struct __attribute__((packed)) _rsp_err {
 	rid_t type_id;
 	char message[TEXT_LEN];
 };

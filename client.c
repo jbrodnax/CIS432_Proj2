@@ -11,14 +11,14 @@ struct _client_info{
 	char username[NAME_LEN+STR_PADD];
 };
 
-struct req_login login_pkt;
-struct req_logout logout_pkt;
-struct req_join join_pkt;
-struct req_leave leave_pkt;
-struct req_say say_pkt;
-struct req_list list_pkt;
-struct req_who who_pkt;
-struct req_alive alive_pkt;
+struct _req_login req_login;
+struct _req_logout req_logout;
+struct _req_join req_join;
+struct _req_leave req_leave;
+struct _req_say req_say;
+struct _req_list req_list;
+struct _req_who req_who;
+struct _req_alive req_alive;
 
 struct _server_info server_info;
 struct _client_info client_info;
@@ -32,15 +32,15 @@ int send_data();
 
 void send_login_test(){
 	char test_name[]="John";
-	char data[sizeof(struct req_login)];
+	char data[sizeof(struct _req_login)];
 	int n, serverlen;
 
 	serverlen = sizeof(struct sockaddr);
-	memset(&login_pkt, 0, sizeof(struct req_login));
-	login_pkt.type_id = REQ_LOGIN;
-	strncpy(login_pkt.username, test_name, NAME_LEN);
-	memcpy(data, &login_pkt, sizeof(struct req_login));
-	n = sendto(sockfd, data, sizeof(struct req_login), 0, (struct sockaddr *)&server_info.serveraddr, serverlen);
+	memset(&req_login, 0, sizeof(struct _req_login));
+	req_login.type_id = REQ_LOGIN;
+	strncpy(req_login.username, test_name, NAME_LEN);
+	memcpy(data, &req_login, sizeof(struct _req_login));
+	n = sendto(sockfd, data, sizeof(struct _req_login), 0, (struct sockaddr *)&server_info.serveraddr, serverlen);
         if(n < 0){
         	perror("[!] Error in sendto");
         	exit(1);
@@ -96,11 +96,11 @@ rid_t build_request(rid_t type, int argc, char **argv){
 	memset(output, 0, (BUFSIZE+STR_PADD));
 	switch(type){
 		case REQ_LOGIN:
-			output_size = sizeof(struct req_login);
-			memset(&login_pkt, 0, output_size);
-			login_pkt.type_id = REQ_LOGIN;
-			memcpy(login_pkt.username, client_info.username, NAME_LEN);
-			memcpy(output, &login_pkt, output_size);
+			output_size = sizeof(struct _req_login);
+			memset(&req_login, 0, output_size);
+			req_login.type_id = REQ_LOGIN;
+			memcpy(req_login.username, client_info.username, NAME_LEN);
+			memcpy(output, &req_login, output_size);
 			return REQ_LOGIN;
 		case REQ_LOGOUT:
 			break;
@@ -109,12 +109,12 @@ rid_t build_request(rid_t type, int argc, char **argv){
 		case REQ_LEAVE:
 			break;
 		case REQ_SAY:
-			output_size = sizeof(struct req_say);
-			memset(&say_pkt, 0, output_size);
-			say_pkt.type_id = REQ_SAY;
-			memcpy(say_pkt.channel, channel_name, NAME_LEN);
-			memcpy(say_pkt.text, argv[1], TEXT_LEN);
-			memcpy(output, &say_pkt, output_size);
+			output_size = sizeof(struct _req_say);
+			memset(&req_say, 0, output_size);
+			req_say.type_id = REQ_SAY;
+			memcpy(req_say.channel, channel_name, NAME_LEN);
+			memcpy(req_say.text, argv[1], TEXT_LEN);
+			memcpy(output, &req_say, output_size);
 			return REQ_SAY;
 		case REQ_LIST:
 			break;
