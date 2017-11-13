@@ -68,7 +68,12 @@ rid_t build_request(rid_t type, int argc, char **argv){
 			memcpy(output, &req_logout, output_size);
 			return REQ_LOGOUT;
 		case REQ_JOIN:
-			break;
+			output_size = sizeof(struct _req_join);
+			memset(&req_join, 0, output_size);
+			req_join.type_id = REQ_JOIN;
+			memcpy(req_join.channel, argv[0], NAME_LEN);
+			memcpy(output, &req_join, output_size);
+			return REQ_JOIN;
 		case REQ_LEAVE:
 			break;
 		case REQ_SAY:
@@ -91,12 +96,17 @@ rid_t build_request(rid_t type, int argc, char **argv){
 	return RET_FAILURE;
 }
 
-rid_t resolve_cmd(char *input){
+rid_t resolve_cmd(char *input, char **argv){
 	if(!strncmp(input, "/exit", 5)){
 		//FIX: check return values of build_request and send_data
 		if(build_request(REQ_LOGOUT, 0, NULL) == REQ_LOGOUT){
 			send_data();
 			return REQ_LOGOUT;
+		}
+	}else if(!strncmp(input, "/join", 5)){
+		if(build_request(REQ_JOIN, 2, argv) == REQ_JOIN){
+			send_data();
+			return REQ_JOIN;
 		}
 	}
 
@@ -117,7 +127,7 @@ void handle_user_input(char *input, int n, char **argv){
 	}
 
 	if(is_cmd == 1){
-		if(resolve_cmd(input) == REQ_LOGOUT){
+		if(resolve_cmd(input, argv) == REQ_LOGOUT){
 			free(argv);
 			free(input);
 			cooked_mode();

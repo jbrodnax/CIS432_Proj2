@@ -43,17 +43,11 @@ void error(char *msg){
 }
 
 void test_chm(){
-	struct channel_entry *ch;
 	if(!channel_create(init_channelname, &channel_manager)){
 		fprintf(stderr, "[!] Error: Channel creation of (%s) failed.");
 		exit(EXIT_FAILURE);
-	}else{
-		ch = channel_search(init_channelname, &channel_manager);
-		if(ch)
-			channel_remove(ch, &channel_manager);
-		else
-			exit(EXIT_FAILURE);
 	}
+	return;
 }
 
 void init_server(){
@@ -116,6 +110,7 @@ void init_server(){
 
 rid_t handle_request(char *data){
 	struct client_entry *client;
+	struct channel_entry *channel;
 	rid_t type;
 
 	/*Check if request came from authenticated client*/
@@ -147,7 +142,34 @@ rid_t handle_request(char *data){
 			client_remove(client, &client_manager);
 			return REQ_LOGOUT;
 		case REQ_JOIN:
-			break;
+			if(!(req_join = malloc(sizeof(struct _req_join)))){
+				perror("Error in malloc");
+				exit(EXIT_FAILURE);
+			}
+			memset(req_join, 0, sizeof(struct _req_join));
+			req_join->type_id = REQ_JOIN;
+			//FIX: remove -1 on NAME_LEN
+			memcpy(req_join->channel, &data[sizeof(rid_t)], NAME_LEN-1);
+			printf("[>] Join request from (%s) for channel (%s)\n", client->username, req_join->channel);
+			
+			channel = channel_search(req_join->channel, &channel_manager);
+			if(!channel){
+				if(channel_create(req_join->channel, &channel_manager) != 0){
+					free(req_join);
+					break;
+				}
+			}
+			if(channel_add_client(client, channel) != 0){
+				free(req_join);
+				break;
+			}
+			if(client_add_channel(channel, client) != 0){
+				free(req_join);
+				break;
+			}
+			free(req_join);
+			
+			return REQ_JOIN;
 		case REQ_LEAVE:
 			break;
 		case REQ_SAY:
@@ -157,6 +179,7 @@ rid_t handle_request(char *data){
 			}
 			memset(req_say, 0, sizeof(struct _req_say));
 			req_say->type_id = REQ_SAY;
+			//FIX: remove -1 on NAME_LEN
 			memcpy(req_say->channel, &data[sizeof(rid_t)], NAME_LEN-1);
 			memcpy(req_say->text, &data[(sizeof(rid_t)+NAME_LEN)], TEXT_LEN-1);
 			printf("[>] Say request from (%s) for channel: (%s)\n\tMessage: %s\n", client->username, req_say->channel, req_say->text);

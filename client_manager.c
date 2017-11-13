@@ -64,6 +64,51 @@ struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _clien
 	return NULL;
 }
 
+int client_add_channel(struct channel_entry *channel, struct client_entry *client){
+
+	if(!channel || !client){
+		error_msg("client_add_channel received null argument.");
+		return -1;
+	}
+	if(client->num_channels >= (MAX_CHANNELCLIENTS-1)){
+		error_msg("client is subscribed to max number of channels.");
+		return -1;
+	}
+
+	client->channel_list[client->num_channels] = channel;
+	client->num_channels++;
+
+	return 0;
+}
+
+int client_remove_channel(struct channel_entry *channel, struct client_entry *client){
+	struct channel_entry *current;
+	int n = 0;
+
+	if(!client || !channel){
+		error_msg("client_remove_channel received null argument.");
+		return -1;
+	}
+	if(client->num_channels < 1){
+		error_msg("client is not subscribed to any channels.");
+		return -1;
+	}
+
+	while(n < client->num_channels){
+		current = client->channel_list[n];
+		if(!memcmp(current->channel_name, channel->channel_name, NAME_LEN))
+			break;
+		n++;
+	}
+	while(n < client->num_channels){
+		memcpy(client->channel_list[n], client->channel_list[n+1], sizeof(struct channel_entry *));
+		n++;
+	}
+
+
+	return 0;
+}
+
 struct client_entry *client_list_tail(struct _client_manager *clm){
 /*Returns ptr to last client_entry in list*/
 	struct client_entry *client;
@@ -99,6 +144,7 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 			error_msg(NULL);
 			exit(1);
 		}
+		memset(new_client, 0, sizeof(struct client_entry));
 		clm->list_head = new_client;	
 	}else{
 		/*if(client_test_search(name, clm)){
@@ -116,7 +162,7 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 		clm->list_tail->next = new_client;
 		new_client->prev = clm->list_tail;
 	}
-	memset(new_client, 0, NAME_LEN);
+	//memset(new_client, 0, NAME_LEN);
 	memcpy(new_client->username, name, NAME_LEN);
 	memcpy(&new_client->clientaddr, clientaddr, sizeof(struct sockaddr_in));
 
