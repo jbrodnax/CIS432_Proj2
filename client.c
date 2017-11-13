@@ -1,8 +1,4 @@
-#include "duckchat.h"
-#include "raw.h"
-
-#define STDIN 0
-#define ARGVLEN 8
+#include "client.h"
 
 const char _CMD_EXIT[]="exit";
 const char _CMD_JOIN[]="join";
@@ -10,26 +6,6 @@ const char _CMD_LEAVE[]="leave";
 const char _CMD_LIST[]="list";
 const char _CMD_WHO[]="who";
 const char _CMD_SWITCH[]="switch";
-
-struct _server_info{
-	int portno;
-	struct sockaddr_in serveraddr;
-	struct hostent *server;
-	char *hostname;
-};
-
-struct _channel_sub{
-	char channel_name[NAME_LEN+STR_PADD];
-	struct _channel_sub *next;
-	struct _channel_sub *prev;
-};
-
-struct _client_info{
-	char username[NAME_LEN+STR_PADD];
-	struct _channel_sub *list_head;
-	struct _channel_sub *list_tail;
-	struct _channel_sub *active_channel;
-};
 
 struct _req_login req_login;
 struct _req_logout req_logout;
@@ -116,12 +92,10 @@ rid_t build_request(rid_t type, int argc, char **argv){
 }
 
 rid_t resolve_cmd(char *input, int cmd_offset){
-	char *argv[ARGVLEN];
+	char *argv[1];
 	char channel_name[NAME_LEN+STR_PADD];
 	int i = 0;
 	int n;
-
-	memset(argv, 0, (sizeof(char *)*ARGVLEN));
 
 	cmd_offset++;
 	if(!memcmp(&input[cmd_offset], _CMD_EXIT, strlen(_CMD_EXIT))){
