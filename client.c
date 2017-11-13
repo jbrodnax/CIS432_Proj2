@@ -2,6 +2,14 @@
 #include "raw.h"
 
 #define STDIN 0
+#define ARGVLEN 8
+
+const char _CMD_EXIT[]="exit";
+const char _CMD_JOIN[]="join";
+const char _CMD_LEAVE[]="leave";
+const char _CMD_LIST[]="list";
+const char _CMD_WHO[]="who";
+const char _CMD_SWITCH[]="switch";
 
 struct _server_info{
 	int portno;
@@ -10,8 +18,17 @@ struct _server_info{
 	char *hostname;
 };
 
+struct _channel_sub{
+	char channel_name[NAME_LEN+STR_PADD];
+	struct _channel_sub *next;
+	struct _channel_sub *prev;
+};
+
 struct _client_info{
 	char username[NAME_LEN+STR_PADD];
+	struct _channel_sub *list_head;
+	struct _channel_sub *list_tail;
+	struct _channel_sub *active_channel;
 };
 
 struct _req_login req_login;
@@ -30,7 +47,7 @@ size_t output_size;
 int sockfd;
 fd_set fds;
 /*Just for testing*/
-char channel_name[]="Common";
+//char active_channel_name[]="Common";
 
 int send_data(){
 	int n, serverlen;
@@ -51,6 +68,7 @@ int send_data(){
 }
 
 rid_t build_request(rid_t type, int argc, char **argv){
+	char *active_channel_name;
 
 	memset(output, 0, (BUFSIZE+STR_PADD));
 	switch(type){
@@ -77,11 +95,12 @@ rid_t build_request(rid_t type, int argc, char **argv){
 		case REQ_LEAVE:
 			break;
 		case REQ_SAY:
+			active_channel_name = client_info.active_channel->channel_name;
 			output_size = sizeof(struct _req_say);
 			memset(&req_say, 0, output_size);
 			req_say.type_id = REQ_SAY;
-			memcpy(req_say.channel, channel_name, NAME_LEN);
-			memcpy(req_say.text, argv[1], TEXT_LEN);
+			memcpy(req_say.channel, active_channel_name, NAME_LEN);
+			memcpy(req_say.text, argv[0], TEXT_LEN);
 			memcpy(output, &req_say, output_size);
 			return REQ_SAY;
 		case REQ_LIST:
@@ -96,15 +115,29 @@ rid_t build_request(rid_t type, int argc, char **argv){
 	return RET_FAILURE;
 }
 
-rid_t resolve_cmd(char *input, char **argv){
-	if(!strncmp(input, "/exit", 5)){
-		//FIX: check return values of build_request and send_data
+rid_t resolve_cmd(char *input, int cmd_offset){
+	char *argv[ARGVLEN];
+	char channel_name[NAME_LEN+STR_PADD];
+	int i = 0;
+	int n;
+
+	memset(argv, 0, (sizeof(char *)*ARGVLEN));
+
+	cmd_offset++;
+	if(!memcmp(&input[cmd_offset], _CMD_EXIT, strlen(_CMD_EXIT))){
 		if(build_request(REQ_LOGOUT, 0, NULL) == REQ_LOGOUT){
 			send_data();
 			return REQ_LOGOUT;
 		}
-	}else if(!strncmp(input, "/join", 5)){
-		if(build_request(REQ_JOIN, 2, argv) == REQ_JOIN){
+	}
+	if(!memcmp(&input[cmd_offset], _CMD_JOIN, strlen(_CMD_JOIN))){
+		memset(channel_name, 0, (NAME_LEN+STR_PADD));
+		n = (cmd_offset + strlen(_CMD_JOIN));
+		while(input[n] < 0x21)
+			n++;
+		strncpy(channel_name, &input[n], NAME_LEN);
+		argv[0] = channel_name;
+		if(build_request(REQ_JOIN, 1, argv) == REQ_JOIN){
 			send_data();
 			return REQ_JOIN;
 		}
@@ -113,28 +146,31 @@ rid_t resolve_cmd(char *input, char **argv){
 	return RET_FAILURE;
 }
 
-void handle_user_input(char *input, int n, char **argv){
+void handle_user_input(char *input, int n){
+	char *argv[1];
 	int i = 0;
+	int cmd_offset = 0;
 	int is_cmd = 0;
 
 	while(i < n){
 		if(input[i] == 0x2f && is_cmd == 0){
 			is_cmd = 1;
-		}else if(input[i] < 0x20 || input[i] > 0x7f){
+			cmd_offset = i;
+		}else if(input[i] < 0x20 || input[i] > 0x7e){
 			input[i] = 0x00;
 		}
 		i++;
 	}
 
 	if(is_cmd == 1){
-		if(resolve_cmd(input, argv) == REQ_LOGOUT){
-			free(argv);
+		if(resolve_cmd(input, cmd_offset) == REQ_LOGOUT){
 			free(input);
 			cooked_mode();
 			exit(EXIT_SUCCESS);
 		}
 	}else{
-		build_request(REQ_SAY, 2, argv);
+		argv[0] = input;
+		build_request(REQ_SAY, 1, argv);
 		send_data();
 	}
 
@@ -144,7 +180,6 @@ void handle_user_input(char *input, int n, char **argv){
 void user_prompt(){
 	char *input;
 	char c;
-	char **argv;
 	char dest_bckspace[]="\b \b";
 	int n;
 
@@ -153,15 +188,6 @@ void user_prompt(){
 		perror("Error in malloc");
 		exit(1);
 	}
-
-	argv = malloc((sizeof(char *))*2);
-	if(!argv){
-		perror("Error in malloc");
-		exit(1);
-	}
-	/*FIX: Hardcoded channel name*/
-	argv[0] = channel_name;
-	argv[1] = input;
 
 	memset(input, 0, BUFSIZE+STR_PADD);
 	n = 0;
@@ -185,14 +211,14 @@ void user_prompt(){
 				write(1, &c, 1);
 				n++;
 				if(c == '\n' || c == '\0'){
-					handle_user_input(input, n, argv);
+					handle_user_input(input, n);
 					n = 0;
 					memset(input, 0, BUFSIZE+STR_PADD);
 					write(1, "> ", 2);
 				}
 			}else if(n >= BUFSIZE-1){
 				if(c == '\n' || c == '\0'){
-					handle_user_input(input, n, argv);
+					handle_user_input(input, n);
 					n = 0;
 					memset(input, 0, BUFSIZE+STR_PADD);
 					write(1, "> ", 2);
@@ -209,9 +235,27 @@ void user_prompt(){
 	return;
 }
 
-int send_login(){
+int init_login(){
+	char *argv[1];
+	char channel_name[]="Common";
+
 	if(build_request(REQ_LOGIN, 0, NULL) != REQ_LOGIN){
 		fprintf(stderr, "Error: failed to build login request\n");
+		return -1;
+	}
+	if(send_data() < 0)
+		return -1;
+
+	/*Create and send channel sub for 'Common'*/
+	if(!(client_info.active_channel = malloc(sizeof(struct _channel_sub)))){
+		perror("Error in malloc");
+		exit(EXIT_FAILURE);
+	}
+	memset(client_info.active_channel, 0, sizeof(struct _channel_sub));
+	memcpy(client_info.active_channel->channel_name, channel_name, strlen(channel_name));
+	argv[0] = client_info.active_channel->channel_name;
+	if(build_request(REQ_JOIN, 1, argv) != REQ_JOIN){
+		fprintf(stderr, "Error: init_login failed to build join request\n.");
 		return -1;
 	}
 	if(send_data() < 0)
@@ -264,7 +308,7 @@ int main(int argc, char *argv[]){
 		fprintf(stderr, "[!] Error: raw_mode failed\n");
 		exit(EXIT_FAILURE);
 	}
-	if(send_login() == 0){	
+	if(init_login() == 0){	
 		user_prompt();
 	}
 
