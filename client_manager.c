@@ -472,6 +472,34 @@ int channel_remove_client(struct client_entry *client, struct channel_entry *cha
 	return 0;
 }
 
+int channel_list(struct _rsp_list *rsp_list, struct _channel_manager *chm){
+	struct channel_entry *ch;
+	int offset;
+
+	if(!rsp_list || !chm){
+		error_msg("channel_list received null argument.");
+		return -1;
+	}
+
+	offset = 0;
+	rsp_list->num_channels = 0;
+
+	pthread_rwlock_rdlock(&channel_lock);
+	ch = chm->list_head;
+	while(ch){
+		if(rsp_list->num_channels > LIST_LEN){
+			error_msg("list response has larger number of channel names than allowed.");
+			break;
+		}
+		memcpy(&rsp_list->channel_list[offset], ch->channel_name, NAME_LEN);
+		rsp_list->num_channels++;
+		offset+=NAME_LEN;
+		ch = ch->next;
+	}
+
+	pthread_rwlock_unlock(&channel_lock);
+	return 0;
+}
 
 
 

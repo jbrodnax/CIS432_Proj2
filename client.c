@@ -19,6 +19,7 @@ struct _req_who req_who;
 struct _req_alive req_alive;
 
 struct _rsp_say rsp_say;
+struct _rsp_list rsp_list;
 
 struct _server_info server_info;
 struct _client_info client_info;
@@ -89,7 +90,11 @@ rid_t build_request(rid_t type, int argc, char **argv){
 			memcpy(output, &req_say, output_size);
 			return REQ_SAY;
 		case REQ_LIST:
-			break;
+			output_size = sizeof(struct _req_list);
+			memset(&req_list, 0, output_size);
+			req_list.type_id = REQ_LIST;
+			memcpy(output, &req_list, output_size);
+			return REQ_LIST;
 		case REQ_WHO:
 			break;
 		case REQ_ALIVE:
@@ -167,25 +172,35 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 		else
 			return RET_FAILURE;
 	}
+	else if(!memcmp(&input[cmd_offset], _CMD_LIST, strlen(_CMD_LIST))){
+		if(build_request(REQ_LIST, 0, NULL) == REQ_LIST){
+			if(send_data() > -1)
+				return REQ_LIST;
+			else
+				return RET_FAILURE;
+		}
+	}
 
 	return RET_FAILURE;
 }
 
 void handle_sock_input(int sockfd, char *input){
-	char buf[BUFSIZE+STR_PADD];
+	/*In order to handle possible list and who responses of ~4,136 bytes
+	this function has a uniquely sized input buffer*/
+	char buf[sizeof(struct _rsp_who)+STR_PADD];
 	char safe_name_buf1[NAME_LEN+STR_PADD];
 	char safe_name_buf2[NAME_LEN+STR_PADD];
 	char safe_text_buf[TEXT_LEN+STR_PADD];
 	struct sockaddr_in serveraddr;
 	int serverlen;
-	int n, i, l;
+	int n, i, l, offset;
 	rid_t type;
 
-	memset(buf, 0, BUFSIZE+STR_PADD);
+	memset(buf, 0, (sizeof(struct _rsp_who)+STR_PADD));
 	memset(&serveraddr, 0, sizeof(struct sockaddr_in));
 	serverlen = sizeof(struct sockaddr_in);
 
-	n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr*)&serveraddr, &serverlen);
+	n = recvfrom(sockfd, buf, (sizeof(struct _rsp_who)), 0, (struct sockaddr*)&serveraddr, &serverlen);
 	if(n < 0){
 		perror("Error in recvfrom");
 		return;
@@ -218,6 +233,20 @@ void handle_sock_input(int sockfd, char *input){
 			printf("[%s][%s]: %s\n", safe_name_buf2, safe_name_buf1, safe_text_buf);
 			break;
 		case RSP_LIST:
+			memset(&rsp_list, 0, sizeof(struct _rsp_list));
+			memcpy(&rsp_list, buf, n);
+			if(rsp_list.num_channels < 1 || rsp_list.num_channels > LIST_LEN){
+				printf("[-] Error: list response had invalid number of channels\n");
+				break;
+			}
+			printf("Existing channels:\n");
+			memset(safe_name_buf1, 0, (NAME_LEN+STR_PADD));
+			offset = 0;
+			for(i=0; i < rsp_list.num_channels; i++){
+				memcpy(safe_name_buf1, &rsp_list.channel_list[offset], NAME_LEN);
+				printf("\t%s\n", safe_name_buf1);
+				offset+=NAME_LEN;
+			}
 			break;
 		case RSP_WHO:
 			break;

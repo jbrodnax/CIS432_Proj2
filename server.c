@@ -178,7 +178,15 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		free(entry->req_say);
 
 	}else if(entry->req_list){
-		printf("sending list response");
+		memset(&rsp_list, 0, sizeof(struct _rsp_list));
+		rsp_list.type_id = RSP_LIST;
+		if(channel_list(&rsp_list, &channel_manager) > -1){
+			i = (sizeof(struct _rsp_list) - ((LIST_LEN*NAME_LEN)-(rsp_list.num_channels*NAME_LEN)));
+			printf("[+] List request got (%hu) number of channels and response is of size (%d).\n", rsp_list.num_channels, i);
+			n = sendto(sockfd, &rsp_list, i, 0, (struct sockaddr *)&entry->clientaddr, sizeof(struct sockaddr));
+			if(n < 0)
+				perror("Error in sendto");
+		}
 		free(entry->req_list);
 	}else if(entry->req_who){
 		printf("sending who response");
@@ -318,7 +326,23 @@ rid_t handle_request(char *data){
 
 			return REQ_SAY;
 		case REQ_LIST:
-			break;
+			if(!(req_list = malloc(sizeof(struct _req_list)))){
+				perror("Error in malloc");
+				exit(EXIT_FAILURE);
+			}
+			memset(req_list, 0, sizeof(struct _req_list));
+			req_list->type_id = REQ_LIST;
+			pthread_mutex_lock(&lock1);
+			if(main_queue.size < MAXQSIZE){
+				entry = malloc(sizeof(struct _queue_entry));
+				memset(entry, 0, sizeof(struct _queue_entry));
+				entry->req_list = req_list;
+				memcpy(&entry->clientaddr, &client->clientaddr, sizeof(struct sockaddr_in));
+				main_queue.queue[main_queue.size] = entry;
+				main_queue.size++;
+			}
+			pthread_mutex_unlock(&lock1);
+			return REQ_LIST;
 		case REQ_WHO:
 			break;
 		case REQ_ALIVE:
