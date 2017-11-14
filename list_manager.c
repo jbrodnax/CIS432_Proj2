@@ -18,8 +18,7 @@ struct _channel_sub *channel_search(char *name, struct _client_info *cl){
 		error_msg("channel search received null argument.");
 		return NULL;
 	}
-	if((cl->list_head == NULL) || (cl->num_channels == 0)){
-		error_msg("Not currently subscribed to any channels.");
+	if((cl->list_head == NULL) || (cl->num_channels == 0)){	
 		return NULL;
 	}
 	n = strlen(name);
@@ -82,7 +81,7 @@ struct _channel_sub *channel_add(char *name, struct _client_info *cl){
 	}
 	new_ch = channel_search(name, cl);
 	if(new_ch){
-		error_msg("Already subscribed to channel (%s).");
+		printf("Already subscribed to channel (%s).", name);
 		return new_ch;
 	}
 	/*If list_head is empty, assume client is not subscribed to any channels. list is empty*/

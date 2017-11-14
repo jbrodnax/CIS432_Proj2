@@ -78,6 +78,8 @@ int client_add_channel(struct channel_entry *channel, struct client_entry *clien
 	client->channel_list[client->num_channels] = channel;
 	client->num_channels++;
 
+	printf("[+] Client (%s) added to channel (%s).\n", client->username, channel->channel_name);
+
 	return 0;
 }
 
@@ -96,15 +98,17 @@ int client_remove_channel(struct channel_entry *channel, struct client_entry *cl
 
 	while(n < client->num_channels){
 		current = client->channel_list[n];
-		if(!memcmp(current->channel_name, channel->channel_name, NAME_LEN))
+		if(!memcmp(current->channel_name, channel->channel_name, NAME_LEN)){
+			printf("[-] Client (%s) removed from channel (%s).\n", client->username, channel->channel_name);
 			break;
+		}
 		n++;
 	}
 	while(n < client->num_channels){
-		memcpy(client->channel_list[n], client->channel_list[n+1], sizeof(struct channel_entry *));
+		memcpy(&client->channel_list[n], &client->channel_list[n+1], sizeof(struct channel_entry *));
 		n++;
 	}
-
+	client->num_channels--;
 
 	return 0;
 }
@@ -311,7 +315,8 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm){
 	/*Update list tail and number of clients*/
 	chm->list_tail = new_channel;
 	chm->num_channels++;
-	puts("[+] New channel added");
+	new_channel->num_clients = 0;
+	printf("[+] New channel (%s) created.\n", new_channel->channel_name);
 	//client_print(new_client);
 
 	return new_channel;
@@ -389,6 +394,8 @@ int channel_add_client(struct client_entry *client, struct channel_entry *channe
 	channel->client_list[channel->num_clients] = client;
 	channel->num_clients++;
 
+	printf("[+] Channel (%s) accepted client (%s).\n", channel->channel_name, client->username);
+
 	return 0;
 }
 
@@ -414,12 +421,11 @@ int channel_remove_client(struct client_entry *client, struct channel_entry *cha
 		}
 		n++;
 	}
-	if(n < channel->num_clients){
-		while(n < channel->num_clients){
-			memcpy(channel->client_list[n], channel->client_list[n+1], sizeof(struct client_entry *));
-			n++;
-		}
+	while(n < channel->num_clients){
+		memcpy(&channel->client_list[n], &channel->client_list[n+1], sizeof(struct client_entry *));
+		n++;
 	}
+	channel->num_clients--;
 
 	return 0;
 }

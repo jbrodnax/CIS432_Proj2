@@ -77,6 +77,8 @@ rid_t build_request(rid_t type, int argc, char **argv){
 			return REQ_LEAVE;
 		case REQ_SAY:
 			active_channel_name = client_info.active_channel->channel_name;
+			if(active_channel_name == NULL)
+				break;
 			output_size = sizeof(struct _req_say);
 			memset(&req_say, 0, output_size);
 			req_say.type_id = REQ_SAY;
@@ -269,7 +271,7 @@ int init_login(){
 	if(send_data() < 0)
 		return -1;
 
-	/*Create and send channel sub for 'Common'*/
+	/*Create and send channel sub for 'Common'
 	if(!(client_info.active_channel = malloc(sizeof(struct _channel_sub)))){
 		perror("Error in malloc");
 		exit(EXIT_FAILURE);
@@ -277,11 +279,16 @@ int init_login(){
 	memset(client_info.active_channel, 0, sizeof(struct _channel_sub));
 	memcpy(client_info.active_channel->channel_name, channel_name, strlen(channel_name));
 	argv[0] = client_info.active_channel->channel_name;
+	*/
+	argv[0] = channel_name;
 	if(build_request(REQ_JOIN, 1, argv) != REQ_JOIN){
 		fprintf(stderr, "Error: init_login failed to build join request\n.");
 		return -1;
 	}
 	if(send_data() < 0)
+		return -1;
+	client_info.active_channel = channel_add(channel_name, &client_info);
+	if(!client_info.active_channel)
 		return -1;
 
 	return 0;

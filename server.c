@@ -154,7 +154,8 @@ rid_t handle_request(char *data){
 			
 			channel = channel_search(req_join->channel, &channel_manager);
 			if(!channel){
-				if(channel_create(req_join->channel, &channel_manager) != 0){
+				channel = channel_create(req_join->channel, &channel_manager);
+				if(!channel){
 					free(req_join);
 					break;
 				}
@@ -171,7 +172,26 @@ rid_t handle_request(char *data){
 			
 			return REQ_JOIN;
 		case REQ_LEAVE:
-			break;
+			if(!(req_leave = malloc(sizeof(struct _req_leave)))){
+				perror("Error in malloc");
+				exit(EXIT_FAILURE);
+			}
+			memset(req_leave, 0, sizeof(struct _req_leave));
+			req_leave->type_id = REQ_LEAVE;
+			memcpy(req_leave->channel, &data[sizeof(rid_t)], NAME_LEN-1);
+			printf("[>] Leave request from (%s) for channel (%s)\n", client->username, req_leave->channel);
+
+			channel = channel_search(req_leave->channel, &channel_manager);
+			if(!channel){
+				//FIX: send error msg to client
+				printf("[?] Error: channel (%s) not found.\n", req_leave->channel);
+				free(req_leave);
+				return REQ_INVALID;
+			}
+			client_remove_channel(channel, client);
+			channel_remove_client(client, channel);
+
+			return REQ_LEAVE;
 		case REQ_SAY:
 			if(!(req_say = malloc(sizeof(struct _req_say)))){
 				perror("Error in malloc");
