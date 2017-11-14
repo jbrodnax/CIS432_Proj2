@@ -6,6 +6,8 @@ const char _CMD_LEAVE[]="leave";
 const char _CMD_LIST[]="list";
 const char _CMD_WHO[]="who";
 const char _CMD_SWITCH[]="switch";
+const char DST_BACKSPACE[]="\b \b";
+const char PROMPT_SYM[]="> ";
 
 struct _req_login req_login;
 struct _req_logout req_logout;
@@ -39,7 +41,7 @@ int send_data(){
 		perror("[!] Error in sendto");
 		return -1;
 	}
-	printf("Message sent (size: %d)\n", n);
+	//printf("Message sent (size: %d)\n", n);
 	return 0;
 }
 
@@ -114,7 +116,7 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 				return RET_FAILURE;
 		}
 	}
-	if(!memcmp(&input[cmd_offset], _CMD_JOIN, strlen(_CMD_JOIN))){
+	else if(!memcmp(&input[cmd_offset], _CMD_JOIN, strlen(_CMD_JOIN))){
 		/*Locate channel name string*/
 		memset(channel_name, 0, (NAME_LEN+STR_PADD));
 		n = (cmd_offset + strlen(_CMD_JOIN));
@@ -135,7 +137,7 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 			}
 		}
 	}
-	if(!memcmp(&input[cmd_offset], _CMD_LEAVE, strlen(_CMD_LEAVE))){
+	else if(!memcmp(&input[cmd_offset], _CMD_LEAVE, strlen(_CMD_LEAVE))){
 		memset(channel_name, 0, (NAME_LEN+STR_PADD));
 		n = (cmd_offset + strlen(_CMD_LEAVE));
 		while(input[n] < 0x21 && n < BUFSIZE-1)
@@ -153,7 +155,7 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 			}
 		}
 	}
-	if(!memcmp(&input[cmd_offset], _CMD_SWITCH, strlen(_CMD_SWITCH))){
+	else if(!memcmp(&input[cmd_offset], _CMD_SWITCH, strlen(_CMD_SWITCH))){
 		memset(channel_name, 0, (NAME_LEN+STR_PADD));
 		n = (cmd_offset + strlen(_CMD_SWITCH));
 		while(input[n] < 0x21 && n < BUFSIZE-1)
@@ -169,14 +171,14 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 	return RET_FAILURE;
 }
 
-void handle_sock_input(int sockfd){
+void handle_sock_input(int sockfd, char *input){
 	char buf[BUFSIZE+STR_PADD];
 	char safe_name_buf1[NAME_LEN+STR_PADD];
 	char safe_name_buf2[NAME_LEN+STR_PADD];
 	char safe_text_buf[TEXT_LEN+STR_PADD];
 	struct sockaddr_in serveraddr;
 	int serverlen;
-	int n;
+	int n, i, l;
 	rid_t type;
 
 	memset(buf, 0, BUFSIZE+STR_PADD);
@@ -190,6 +192,16 @@ void handle_sock_input(int sockfd){
 	}
 	//FIX: add server addr and port validation
 	memcpy(&type, buf, sizeof(rid_t));
+	if(type > RSP_ERR){
+		printf("[-] Error: received response with invalid type (%hu)\n", type);
+		return;
+	}
+
+	/*Clean user prompt*/
+	l = (strlen(input) + strlen(PROMPT_SYM));
+	for(i=0; i < l; i++)
+		write(1, DST_BACKSPACE, strlen(DST_BACKSPACE));
+
 	switch (type){
 		case RSP_SAY:
 			if(n != sizeof(struct _rsp_say)){
@@ -204,10 +216,21 @@ void handle_sock_input(int sockfd){
 			memcpy(safe_name_buf2, rsp_say.channel, NAME_LEN);
 			memcpy(safe_text_buf, rsp_say.text, TEXT_LEN);
 			printf("[%s][%s]: %s\n", safe_name_buf2, safe_name_buf1, safe_text_buf);
-			return;
+			break;
+		case RSP_LIST:
+			break;
+		case RSP_WHO:
+			break;
+		case RSP_ERR:
+			break;
 		default:
 			printf("[-] Error: received response with invalid type (%hu)\n", type);
 	}
+	/*Restore prompt and user input*/
+	l = strlen(input);
+	write(1, PROMPT_SYM, strlen(PROMPT_SYM));
+	for(i=0; i < l; i++)
+		write(1, &input[i], 1);
 
 	return;
 }
@@ -248,8 +271,7 @@ void handle_user_input(char *input, int n){
 void user_prompt(){
 	char *input;
 	char c;
-	char dest_bckspace[]="\b \b";
-	int n;
+	int n, promptlen;
 
 	input = malloc(BUFSIZE+STR_PADD);
 	if(!input){
@@ -259,7 +281,8 @@ void user_prompt(){
 
 	memset(input, 0, BUFSIZE+STR_PADD);
 	n = 0;
-	write(1, "> ", 2);
+	promptlen = strlen(PROMPT_SYM);
+	write(1, PROMPT_SYM, promptlen);
 	while(1){
 		FD_ZERO(&fds);
 		FD_SET(sockfd, &fds);
@@ -273,7 +296,7 @@ void user_prompt(){
 			if(c == 0x7f && n > 0){
 				n--;
 				input[n] = 0;
-				write(1, dest_bckspace, strlen(dest_bckspace));
+				write(1, DST_BACKSPACE, strlen(DST_BACKSPACE));
 			}else if(n < BUFSIZE-1){
 				input[n] = c;
 				write(1, &c, 1);
@@ -282,21 +305,20 @@ void user_prompt(){
 					handle_user_input(input, n);
 					n = 0;
 					memset(input, 0, BUFSIZE+STR_PADD);
-					write(1, "> ", 2);
+					write(1, PROMPT_SYM, promptlen);
 				}
 			}else if(n >= BUFSIZE-1){
 				if(c == '\n' || c == '\0'){
 					handle_user_input(input, n);
 					n = 0;
 					memset(input, 0, BUFSIZE+STR_PADD);
-					write(1, "> ", 2);
+					write(1, PROMPT_SYM, promptlen);
 				}
 			}
 			
 		}
 		if(FD_ISSET(sockfd, &fds)){
-			handle_sock_input(sockfd);
-			//printf("Ready to read from udp socket\n");
+			handle_sock_input(sockfd, input);	
 		}
 	}
 
@@ -314,15 +336,6 @@ int init_login(){
 	if(send_data() < 0)
 		return -1;
 
-	/*Create and send channel sub for 'Common'
-	if(!(client_info.active_channel = malloc(sizeof(struct _channel_sub)))){
-		perror("Error in malloc");
-		exit(EXIT_FAILURE);
-	}
-	memset(client_info.active_channel, 0, sizeof(struct _channel_sub));
-	memcpy(client_info.active_channel->channel_name, channel_name, strlen(channel_name));
-	argv[0] = client_info.active_channel->channel_name;
-	*/
 	argv[0] = channel_name;
 	if(build_request(REQ_JOIN, 1, argv) != REQ_JOIN){
 		fprintf(stderr, "Error: init_login failed to build join request\n.");
