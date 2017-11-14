@@ -20,6 +20,8 @@ struct _req_alive req_alive;
 
 struct _rsp_say rsp_say;
 struct _rsp_list rsp_list;
+struct _rsp_who rsp_who;
+struct _rsp_err rsp_err;
 
 struct _server_info server_info;
 struct _client_info client_info;
@@ -96,7 +98,12 @@ rid_t build_request(rid_t type, int argc, char **argv){
 			memcpy(output, &req_list, output_size);
 			return REQ_LIST;
 		case REQ_WHO:
-			break;
+			output_size = sizeof(struct _req_who);
+			memset(&req_who, 0, output_size);
+			req_who.type_id = REQ_WHO;
+			memcpy(req_who.channel, argv[0], NAME_LEN);
+			memcpy(output, &req_who, output_size);
+			return REQ_WHO;
 		case REQ_ALIVE:
 			break;
 		default:
@@ -180,6 +187,22 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 				return RET_FAILURE;
 		}
 	}
+	else if(!memcmp(&input[cmd_offset], _CMD_WHO, strlen(_CMD_WHO))){
+		memset(channel_name, 0, (NAME_LEN+STR_PADD));
+                n = (cmd_offset + strlen(_CMD_LEAVE));
+                while(input[n] < 0x21 && n < BUFSIZE-1)
+                        n++;
+                strncpy(channel_name, &input[n], NAME_LEN);
+                if((ch = channel_search(channel_name, &client_info)) == NULL)
+                        return RET_FAILURE;
+                argv[0] = channel_name;
+		if(build_request(REQ_WHO, 1, argv) == REQ_WHO){
+			if(send_data() > -1)
+				return REQ_WHO;
+			else
+				return RET_FAILURE;
+		}
+	}
 
 	return RET_FAILURE;
 }
@@ -249,6 +272,21 @@ void handle_sock_input(int sockfd, char *input){
 			}
 			break;
 		case RSP_WHO:
+			memset(&rsp_who, 0, sizeof(struct _rsp_who));
+			memcpy(&rsp_who, buf, n);
+			if(rsp_who.num_users > WHO_LEN){
+				printf("[-] Error: who response had invalid number of users\n");
+				break;
+			}
+			memset(safe_name_buf1, 0, (NAME_LEN+STR_PADD));
+			memcpy(safe_name_buf1, rsp_who.channel, NAME_LEN);
+			printf("Users on channel %s:\n", safe_name_buf1);
+			offset = 0;
+			for(i=0; i < rsp_who.num_users; i++){
+				memcpy(safe_name_buf1, &rsp_who.users[offset], NAME_LEN);
+				printf("\t%s\n", safe_name_buf1);
+				offset+=NAME_LEN;
+			}
 			break;
 		case RSP_ERR:
 			break;

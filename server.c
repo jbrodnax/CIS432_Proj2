@@ -189,7 +189,23 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		}
 		free(entry->req_list);
 	}else if(entry->req_who){
-		printf("sending who response");
+		ch = channel_search(entry->req_who->channel, &channel_manager);
+		if(!ch){
+			printf("[!] Error: channel (%s) does not exist.\n", entry->req_who->channel);
+			free(entry->req_who);
+			free(entry);
+			return;
+		}
+		memset(&rsp_who, 0, sizeof(struct _rsp_who));
+		rsp_who.type_id = RSP_WHO;
+		memcpy(rsp_who.channel, entry->req_who->channel, NAME_LEN);
+		if(channel_who(&rsp_who, ch) > -1){
+			i = (sizeof(struct _rsp_who) - ((WHO_LEN*NAME_LEN)-(rsp_who.num_users*NAME_LEN)));
+			printf("[+] Who request has (%hu) number of channels and response is of size (%d).\n", rsp_who.num_users, i);
+			n = sendto(sockfd, &rsp_who, i, 0, (struct sockaddr *)&entry->clientaddr, sizeof(struct sockaddr));
+			if(n < 0)
+				perror("Error in sendto");
+		}
 		free(entry->req_who);
 	}else{
 		printf("[!] Error: send_data received empty request type.\n");
@@ -344,7 +360,24 @@ rid_t handle_request(char *data){
 			pthread_mutex_unlock(&lock1);
 			return REQ_LIST;
 		case REQ_WHO:
-			break;
+			if(!(req_who = malloc(sizeof(struct _req_who)))){
+				perror("Error in malloc");
+				exit(EXIT_FAILURE);
+			}
+			memset(req_who, 0, sizeof(struct _req_who));
+			req_who->type_id = REQ_WHO;
+			memcpy(req_who->channel, &data[sizeof(rid_t)], NAME_LEN);
+			pthread_mutex_lock(&lock1);
+			if(main_queue.size < MAXQSIZE){
+				entry = malloc(sizeof(struct _queue_entry));
+				memset(entry, 0, sizeof(struct _queue_entry));
+				entry->req_who = req_who;
+				memcpy(&entry->clientaddr, &client->clientaddr, sizeof(struct sockaddr_in));
+				main_queue.queue[main_queue.size] = entry;
+				main_queue.size++;
+			}
+			pthread_mutex_unlock(&lock1);
+			return REQ_WHO;
 		case REQ_ALIVE:
 			break;
 		default:

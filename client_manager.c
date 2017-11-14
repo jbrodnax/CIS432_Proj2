@@ -501,7 +501,38 @@ int channel_list(struct _rsp_list *rsp_list, struct _channel_manager *chm){
 	return 0;
 }
 
+int channel_who(struct _rsp_who *rsp_who, struct channel_entry *ch){
+	struct client_entry *client;
+	int i, offset;
 
+	if(!rsp_who || !ch){
+		error_msg("channel_who received null argument.");
+		return -1;
+	}
+
+	offset = 0;
+	rsp_who->num_users = 0;
+
+	pthread_rwlock_rdlock(&channel_lock);
+	if(ch->num_clients > WHO_LEN){
+		error_msg("channel_who found channel with invalid number of clients.");
+		pthread_rwlock_unlock(&channel_lock);
+		return -1;
+	}
+	pthread_rwlock_rdlock(&client_lock);
+	for(i=0; i < ch->num_clients; i++){
+		client = ch->client_list[i];
+		if(client){
+			memcpy(&rsp_who->users[offset], client->username, NAME_LEN);
+			rsp_who->num_users++;
+			offset+=NAME_LEN;
+		}
+	}
+
+	pthread_rwlock_unlock(&client_lock);
+	pthread_rwlock_unlock(&channel_lock);
+	return 0;
+}
 
 
 

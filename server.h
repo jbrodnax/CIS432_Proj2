@@ -49,6 +49,7 @@ void channel_clean(struct _channel_manager *chm);
 int channel_add_client(struct client_entry *client, struct channel_entry *channel);
 int channel_remove_client(struct client_entry *client, struct channel_entry *channel);
 int channel_list(struct _rsp_list *rsp_list, struct _channel_manager *chm);
+int channel_who(struct _rsp_who *rsp_who, struct channel_entry *ch);
 
 /*server.c function prototypes*/
 void *thread_responder(void *vargp);
