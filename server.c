@@ -238,7 +238,7 @@ rid_t handle_request(char *data){
 			free(req_login);
 			return REQ_LOGIN;
 		case REQ_LOGOUT:
-			client_remove(client, &client_manager);
+			client_logout(client, &client_manager);
 			return REQ_LOGOUT;
 		case REQ_JOIN:
 			if(!(req_join = malloc(sizeof(struct _req_join)))){

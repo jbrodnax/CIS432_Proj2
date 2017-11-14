@@ -216,6 +216,37 @@ int client_remove(struct client_entry *client, struct _client_manager *clm){
 	return 0;
 }
 
+int client_logout(struct client_entry *client, struct _client_manager *clm){
+	struct channel_entry *ch;
+	struct channel_entry *channel_list[MAX_CHANNELCLIENTS];
+	int i;
+
+	if(!client || !clm){
+		error_msg("client_logout received null argument.");
+		return -1;
+	}
+
+	pthread_rwlock_rdlock(&client_lock);
+	if(client->num_channels > 0){
+		memcpy(channel_list, client->channel_list, (sizeof(struct channel_entry *)*MAX_CHANNELCLIENTS));
+		pthread_rwlock_unlock(&client_lock);
+		/*Remove client from all channels they were subscribbed to*/
+		i = 0;
+		ch = channel_list[0];
+		while(ch){
+			channel_remove_client(client, ch);
+			i++;
+			ch = channel_list[i];
+		}
+		client_remove(client, clm);
+	}else{
+		pthread_rwlock_unlock(&client_lock);
+		client_remove(client, clm);
+	}
+
+	return 0;
+}
+
 void client_clean(struct _client_manager *clm){
 	struct client_entry *client;
 
