@@ -151,7 +151,8 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 			exit(1);
 		}
 		memset(new_client, 0, sizeof(struct client_entry));
-		clm->list_head = new_client;	
+		clm->list_head = new_client;
+		clm->list_tail = new_client;
 	}else{
 		/*if(client_test_search(name, clm)){
 			printf("[-] Client (%s) already exists.\n", name);
@@ -162,6 +163,7 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 			error_msg(NULL);
 			exit(1);
 		}
+		memset(new_client, 0, sizeof(struct client_entry));
 		if(!clm->list_tail)
 			client_list_tail(clm);
 
@@ -229,8 +231,8 @@ void client_clean(struct _client_manager *clm){
 			break;
 
 		client = clm->list_head;
-		if(client->hostp)
-			free(client->hostp);
+		//if(client->hostp)
+		//	free(client->hostp);
 
 		clm->list_head = client->next;	
 		free(client);

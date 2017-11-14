@@ -49,5 +49,6 @@ int channel_add_client(struct client_entry *client, struct channel_entry *channe
 int channel_remove_client(struct client_entry *client, struct channel_entry *channel);
 
 /*server.c function prototypes*/
+void *thread_responder(void *vargp);
 void recvdata_IPv4();
 void recvdata_IPv6();

@@ -16,14 +16,14 @@ struct _req_list req_list;
 struct _req_who req_who;
 struct _req_alive req_alive;
 
+struct _rsp_say rsp_say;
+
 struct _server_info server_info;
 struct _client_info client_info;
 char output[BUFSIZE+STR_PADD];
 size_t output_size;
 int sockfd;
 fd_set fds;
-/*Just for testing*/
-//char active_channel_name[]="Common";
 
 int send_data(){
 	int n, serverlen;
@@ -169,6 +169,49 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 	return RET_FAILURE;
 }
 
+void handle_sock_input(int sockfd){
+	char buf[BUFSIZE+STR_PADD];
+	char safe_name_buf1[NAME_LEN+STR_PADD];
+	char safe_name_buf2[NAME_LEN+STR_PADD];
+	char safe_text_buf[TEXT_LEN+STR_PADD];
+	struct sockaddr_in serveraddr;
+	int serverlen;
+	int n;
+	rid_t type;
+
+	memset(buf, 0, BUFSIZE+STR_PADD);
+	memset(&serveraddr, 0, sizeof(struct sockaddr_in));
+	serverlen = sizeof(struct sockaddr_in);
+
+	n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr*)&serveraddr, &serverlen);
+	if(n < 0){
+		perror("Error in recvfrom");
+		return;
+	}
+	//FIX: add server addr and port validation
+	memcpy(&type, buf, sizeof(rid_t));
+	switch (type){
+		case RSP_SAY:
+			if(n != sizeof(struct _rsp_say)){
+				printf("[-] Error: received Say response with invalid size (%d)\n", n);
+				break;
+			}
+			memcpy(&rsp_say, buf, sizeof(struct _rsp_say));
+			memset(safe_name_buf1, 0, (NAME_LEN+STR_PADD));
+			memset(safe_name_buf2, 0, (NAME_LEN+STR_PADD));
+			memset(safe_text_buf, 0, (TEXT_LEN+STR_PADD));
+			memcpy(safe_name_buf1, rsp_say.username, NAME_LEN);
+			memcpy(safe_name_buf2, rsp_say.channel, NAME_LEN);
+			memcpy(safe_text_buf, rsp_say.text, TEXT_LEN);
+			printf("[%s][%s]: %s\n", safe_name_buf2, safe_name_buf1, safe_text_buf);
+			return;
+		default:
+			printf("[-] Error: received response with invalid type (%hu)\n", type);
+	}
+
+	return;
+}
+
 void handle_user_input(char *input, int n){
 	char *argv[1];
 	int i = 0;
@@ -252,8 +295,8 @@ void user_prompt(){
 			
 		}
 		if(FD_ISSET(sockfd, &fds)){
-			//read data from socket
-			printf("Ready to read from udp socket\n");
+			handle_sock_input(sockfd);
+			//printf("Ready to read from udp socket\n");
 		}
 	}
 

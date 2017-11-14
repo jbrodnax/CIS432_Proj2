@@ -109,7 +109,9 @@ void init_server(){
 	switch (p->ai_family){
 		case AF_INET:
 			puts("ai_family IPv4");
-			server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;	
+			server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;
+			/*Create response thread*/
+			pthread_create(&tid[0], NULL, thread_responder, NULL);
 			recvdata_IPv4();
 			break;
 		case AF_INET6:
@@ -142,7 +144,7 @@ void request_dequeue(struct _req_queue *thread_queue){
 }
 
 void send_data(struct _queue_entry *entry, int sockfd){
-	int n;
+	int n, i;
 	struct channel_entry *ch;
 	struct client_entry *client;
 	struct _rsp_say rsp_say;
@@ -164,8 +166,9 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		memcpy(rsp_say.channel, entry->req_say->channel, NAME_LEN);
 		memcpy(rsp_say.username, entry->username, NAME_LEN);
 		memcpy(rsp_say.text, entry->req_say->text, TEXT_LEN);
-		for(n=0; n < ch->num_clients; n++){
-			client = ch->client_list[n];
+		for(i=0; i < ch->num_clients; i++){
+			printf("[+] Channel (%s) has (%d) clients.\n", ch->channel_name, ch->num_clients);
+			client = ch->client_list[i];
 			printf("[<] Sending Client (%s)\tData (%s)\ton Channel(%s)\tfrom User(%s)\n",
 				client->username, rsp_say.text, rsp_say.channel, rsp_say.username);
 			n = sendto(sockfd, &rsp_say, sizeof(struct _rsp_say), 0, (struct sockaddr *)&client->clientaddr, sizeof(struct sockaddr));
@@ -306,6 +309,7 @@ rid_t handle_request(char *data){
 				entry = malloc(sizeof(struct _queue_entry));
 				memset(entry, 0, sizeof(struct _queue_entry));
 				entry->req_say = req_say;
+				memcpy(entry->username, client->username, NAME_LEN);
 				memcpy(&entry->clientaddr, &client->clientaddr, sizeof(struct sockaddr_in));
 				main_queue.queue[main_queue.size] = entry;
 				main_queue.size++;
