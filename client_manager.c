@@ -12,6 +12,8 @@ char channel_err4[]="max number of clients on channel reached.";
 char channel_err5[]="channel_remove_client received null argument.";
 char channel_err6[]="no clients are in this channel.";
 
+pthread_mutex_t lock2 = PTHREAD_MUTEX_INITIALIZER;
+
 void error_msg(char *err_msg){
 	if(!err_msg){
 		perror("[-] ERROR:\n\t ");
@@ -283,6 +285,7 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm){
 		return NULL;
 	}
 
+	pthread_mutex_lock(&lock2);
 	if(!chm->list_head){
 		new_channel = malloc(sizeof(struct channel_entry));
 		if(!new_channel){
@@ -316,6 +319,8 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm){
 	chm->list_tail = new_channel;
 	chm->num_channels++;
 	new_channel->num_clients = 0;
+
+	pthread_mutex_unlock(&lock2);
 	printf("[+] New channel (%s) created.\n", new_channel->channel_name);
 	//client_print(new_client);
 
@@ -337,7 +342,7 @@ int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 
 	//client = client_search(clientaddr, client_list);
 	//client = client_test_search(name, clm);
-
+	pthread_mutex_lock(&lock2);
 	/*Unlink list node and update clm head or tail if unlinking head or tail*/
 	if(channel->next && channel->prev){
 		channel->next->prev = channel->prev;
@@ -351,7 +356,7 @@ int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 	}
 	if(chm->num_channels > 0)
 		chm->num_channels--;
-	
+	pthread_mutex_unlock(&lock2);
 	puts("[+] Unlinked channel:");
 	//client_print(client);
 
@@ -385,6 +390,7 @@ int channel_add_client(struct client_entry *client, struct channel_entry *channe
 		error_msg(channel_err3);
 		return -1;
 	}
+	pthread_mutex_lock(&lock2);
 	/*Max number of clients per channel is actually 1 less than defined since the last array index needs to remain 0 for shifting during removal*/
 	if(channel->num_clients >= MAX_CHANNELCLIENTS-1){
 		error_msg(channel_err4);
@@ -393,6 +399,7 @@ int channel_add_client(struct client_entry *client, struct channel_entry *channe
 
 	channel->client_list[channel->num_clients] = client;
 	channel->num_clients++;
+	pthread_mutex_unlock(&lock2);
 
 	printf("[+] Channel (%s) accepted client (%s).\n", channel->channel_name, client->username);
 
@@ -408,6 +415,7 @@ int channel_remove_client(struct client_entry *client, struct channel_entry *cha
 		error_msg(channel_err5);
 		return -1;
 	}
+	pthread_mutex_lock(&lock2);
 	if(channel->num_clients < 1){
 		error_msg(channel_err6);
 		return -1;
@@ -426,6 +434,7 @@ int channel_remove_client(struct client_entry *client, struct channel_entry *cha
 		n++;
 	}
 	channel->num_clients--;
+	pthread_mutex_unlock(&lock2);
 
 	return 0;
 }

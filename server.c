@@ -20,6 +20,19 @@ struct _client_info{
 	int portno;
 };
 
+struct _queue_entry{
+	struct sockaddr_in clientaddr;
+	char username[NAME_LEN+STR_PADD];
+	struct _req_say *req_say;
+	struct _req_list *req_list;
+	struct _req_who *req_who;
+};
+
+struct _req_queue{
+	struct _queue_entry *queue[MAXQSIZE];
+	int size;
+};
+
 struct _req_login* req_login;
 struct _req_logout* req_logout;
 struct _req_join* req_join;
@@ -28,6 +41,7 @@ struct _req_say* req_say;
 struct _req_list* req_list;
 struct _req_who* req_who;
 struct _req_alive* req_alive;
+struct _req_queue main_queue;
 
 struct _client_manager client_manager;
 struct _channel_manager channel_manager;
@@ -35,6 +49,8 @@ struct _server_info server_info;
 struct _client_info client_info;
 struct addrinfo hints, *servinfo, *p;
 
+pthread_t tid[1];
+pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 char init_channelname[]="Common";
 
 void error(char *msg){
@@ -54,8 +70,10 @@ void init_server(){
 	int rv, optval;
 	void *ptr;
 
+	/*Zero-out all global structs*/
 	memset(&client_manager, 0, sizeof(struct _client_manager));
 	memset(&channel_manager, 0, sizeof(struct _channel_manager));
+	memset(&main_queue, 0, sizeof(struct _req_queue));
 	memset(&hints, 0, sizeof(hints));
 	/*Init server's addr info for either IPv6 or IPv4, UDP socket, and default system's IP addr*/
 	hints.ai_family = AF_INET;//AF_UNSPEC;
@@ -108,9 +126,87 @@ void init_server(){
 	return;
 }
 
+void request_dequeue(struct _req_queue *thread_queue){
+	int n;
+
+	pthread_mutex_lock(&lock1);
+	if(main_queue.size > 0){
+		n = main_queue.size;
+		memcpy(thread_queue->queue, main_queue.queue, (sizeof(struct _queue_entry *)*n));
+		memset(main_queue.queue, 0, (sizeof(struct _queue_entry *)*n));
+		thread_queue->size = n;
+		main_queue.size = 0;
+	}
+	pthread_mutex_unlock(&lock1);
+	return;
+}
+
+void send_data(struct _queue_entry *entry, int sockfd){
+	int n;
+	struct channel_entry *ch;
+	struct client_entry *client;
+	struct _rsp_say rsp_say;
+        struct _rsp_list rsp_list;
+        struct _rsp_who rsp_who;
+        struct _rsp_err rsp_err;
+
+	if(entry->req_say){
+		ch = channel_search(entry->req_say->channel, &channel_manager);
+		if(!ch){
+			printf("[!] Error: channel (%s) does not exist.\n", entry->req_say->channel);
+			//send error rsp
+			free(entry->req_say);
+			free(entry);
+			return;
+		}
+		memset(&rsp_say, 0, sizeof(struct _rsp_say));
+		rsp_say.type_id = RSP_SAY;
+		memcpy(rsp_say.channel, entry->req_say->channel, NAME_LEN);
+		memcpy(rsp_say.username, entry->username, NAME_LEN);
+		memcpy(rsp_say.text, entry->req_say->text, TEXT_LEN);
+		for(n=0; n < ch->num_clients; n++){
+			client = ch->client_list[n];
+			printf("[<] Sending Client (%s)\tData (%s)\ton Channel(%s)\tfrom User(%s)\n",
+				client->username, rsp_say.text, rsp_say.channel, rsp_say.username);
+			n = sendto(sockfd, &rsp_say, sizeof(struct _rsp_say), 0, (struct sockaddr *)&client->clientaddr, sizeof(struct sockaddr));
+			if(n < 0)
+				perror("Error in sendto");
+		}
+		free(entry->req_say);
+
+	}else if(entry->req_list){
+		printf("sending list response");
+		free(entry->req_list);
+	}else if(entry->req_who){
+		printf("sending who response");
+		free(entry->req_who);
+	}else{
+		printf("[!] Error: send_data received empty request type.\n");
+	}
+
+	free(entry);
+}
+
+void *thread_responder(void *vargp){
+	int t_sockfd, i;
+	struct _req_queue thread_queue;	
+
+	t_sockfd = server_info.sockfd;
+	while(1){
+		memset(&thread_queue, 0, sizeof(struct _req_queue));
+		request_dequeue(&thread_queue);
+		if(thread_queue.size > 0){
+			for(i=0; i < thread_queue.size; i++){
+				send_data(thread_queue.queue[i], t_sockfd);
+			}
+		}
+	}
+}
+
 rid_t handle_request(char *data){
 	struct client_entry *client;
 	struct channel_entry *channel;
+	struct _queue_entry *entry;
 	rid_t type;
 
 	/*Check if request came from authenticated client*/
@@ -203,7 +299,19 @@ rid_t handle_request(char *data){
 			memcpy(req_say->channel, &data[sizeof(rid_t)], NAME_LEN-1);
 			memcpy(req_say->text, &data[(sizeof(rid_t)+NAME_LEN)], TEXT_LEN-1);
 			printf("[>] Say request from (%s) for channel: (%s)\n\tMessage: %s\n", client->username, req_say->channel, req_say->text);
-			free(req_say);
+			/*Enqueue request for sender thread*/
+			pthread_mutex_lock(&lock1);
+			if(main_queue.size < MAXQSIZE){
+				//FIX: add check
+				entry = malloc(sizeof(struct _queue_entry));
+				memset(entry, 0, sizeof(struct _queue_entry));
+				entry->req_say = req_say;
+				memcpy(&entry->clientaddr, &client->clientaddr, sizeof(struct sockaddr_in));
+				main_queue.queue[main_queue.size] = entry;
+				main_queue.size++;
+			}
+			pthread_mutex_unlock(&lock1);
+
 			return REQ_SAY;
 		case REQ_LIST:
 			break;
