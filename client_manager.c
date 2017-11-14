@@ -12,7 +12,8 @@ char channel_err4[]="max number of clients on channel reached.";
 char channel_err5[]="channel_remove_client received null argument.";
 char channel_err6[]="no clients are in this channel.";
 
-pthread_mutex_t lock2 = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t channel_lock;
+pthread_rwlock_t client_lock;
 
 void error_msg(char *err_msg){
 	if(!err_msg){
@@ -30,39 +31,26 @@ void client_print(struct client_entry *client){
 	}
 }
 
-struct client_entry *client_test_search(char *name, struct _client_manager *clm){
-	struct client_entry *client;
-
-	if(!name || !clm)
-		return NULL;
-
-	client = clm->list_head;
-
-	while(client){
-		if(!strncmp(name, client->username, NAME_LEN))
-			return client;
-		client = client->next;
-	}
-	//printf("[-] Client (%s) NOT found.\n", name);
-	return NULL;
-}
-
 struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _client_manager *clm){
-/*For now, searches for client based on ip addr and port # by iterating through client list*/
+/*Searches for client based on ip addr and port # by iterating through client list*/
 	struct client_entry *client;
 
 	if(!clientaddr || !clm)
 		return NULL;
 
+	pthread_rwlock_rdlock(&client_lock);
 	client = clm->list_head;
 	while(client){
 		if(clientaddr->sin_addr.s_addr == client->clientaddr.sin_addr.s_addr){
-			if(clientaddr->sin_port == client->clientaddr.sin_port)
+			if(clientaddr->sin_port == client->clientaddr.sin_port){
+				pthread_rwlock_unlock(&client_lock);
 				return client;
+			}
 		}
 		client = client->next;
 	}
 
+	pthread_rwlock_unlock(&client_lock);
 	return NULL;
 }
 
@@ -77,11 +65,12 @@ int client_add_channel(struct channel_entry *channel, struct client_entry *clien
 		return -1;
 	}
 
+	pthread_rwlock_wrlock(&client_lock);
 	client->channel_list[client->num_channels] = channel;
 	client->num_channels++;
-
 	printf("[+] Client (%s) added to channel (%s).\n", client->username, channel->channel_name);
 
+	pthread_rwlock_unlock(&client_lock);
 	return 0;
 }
 
@@ -98,6 +87,7 @@ int client_remove_channel(struct channel_entry *channel, struct client_entry *cl
 		return -1;
 	}
 
+	pthread_rwlock_wrlock(&client_lock);
 	while(n < client->num_channels){
 		current = client->channel_list[n];
 		if(!memcmp(current->channel_name, channel->channel_name, NAME_LEN)){
@@ -112,6 +102,7 @@ int client_remove_channel(struct channel_entry *channel, struct client_entry *cl
 	}
 	client->num_channels--;
 
+	pthread_rwlock_unlock(&client_lock);
 	return 0;
 }
 
@@ -144,6 +135,7 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 		return NULL;
 	}
 
+	pthread_rwlock_wrlock(&client_lock);
 	if(!clm->list_head){
 		new_client = malloc(sizeof(struct client_entry));
 		if(!new_client){
@@ -170,7 +162,6 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 		clm->list_tail->next = new_client;
 		new_client->prev = clm->list_tail;
 	}
-	//memset(new_client, 0, NAME_LEN);
 	memcpy(new_client->username, name, NAME_LEN);
 	memcpy(&new_client->clientaddr, clientaddr, sizeof(struct sockaddr_in));
 
@@ -180,6 +171,7 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 	puts("[+] New client added");
 	client_print(new_client);
 
+	pthread_rwlock_unlock(&client_lock);
 	return new_client;	
 }
 
@@ -198,9 +190,9 @@ int client_remove(struct client_entry *client, struct _client_manager *clm){
 	}
 
 	//client = client_search(clientaddr, client_list);
-	//client = client_test_search(name, clm);
 
 	/*Unlink list node and update clm head or tail if unlinking head or tail*/
+	pthread_rwlock_wrlock(&client_lock);
 	if(client->next && client->prev){
 		client->next->prev = client->prev;
 		client->prev->next = client->next;
@@ -216,16 +208,18 @@ int client_remove(struct client_entry *client, struct _client_manager *clm){
 	puts("[+] Unlinked client:");
 	client_print(client);
 
-	if(client->hostp)
-		free(client->hostp);
+	//if(client->hostp)
+	//	free(client->hostp);
 	free(client);
 
+	pthread_rwlock_unlock(&client_lock);
 	return 0;
 }
 
 void client_clean(struct _client_manager *clm){
 	struct client_entry *client;
 
+	pthread_rwlock_wrlock(&client_lock);
 	while(1){
 		if(!clm->list_head || clm->num_clients < 1)
 			break;
@@ -239,6 +233,8 @@ void client_clean(struct _client_manager *clm){
 		clm->num_clients--;
 	}
 	puts("[!] Client list is clean.");
+
+	pthread_rwlock_unlock(&client_lock);
 	return;
 }
 
@@ -248,13 +244,18 @@ struct channel_entry *channel_search(char *name, struct _channel_manager *chm){
 	if(!name || !chm)
 		return NULL;
 
+	pthread_rwlock_rdlock(&channel_lock);
 	channel = chm->list_head;
 	while(channel){
-		if(!strncmp(name, channel->channel_name, NAME_LEN))
+		if(!strncmp(name, channel->channel_name, NAME_LEN)){
+			pthread_rwlock_unlock(&channel_lock);
 			return channel;
+		}
 		channel = channel->next;
 	}
 	printf("[-] Channel (%s) NOT found.\n", name);
+
+	pthread_rwlock_unlock(&channel_lock);
 	return NULL;
 }
 
@@ -287,15 +288,16 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm){
 		return NULL;
 	}
 
-	pthread_mutex_lock(&lock2);
+	pthread_rwlock_wrlock(&channel_lock);
 	if(!chm->list_head){
 		new_channel = malloc(sizeof(struct channel_entry));
 		if(!new_channel){
 			error_msg(NULL);
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 		memset(new_channel, 0, sizeof(struct channel_entry));
-		chm->list_head = new_channel;	
+		chm->list_head = new_channel;
+		chm->list_tail = new_channel;
 	}else{
 		/*if(client_test_search(name, clm)){
 			printf("[-] Client (%s) already exists.\n", name);
@@ -304,7 +306,7 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm){
 		new_channel = malloc(sizeof(struct channel_entry));
 		if(!new_channel){
 			error_msg(NULL);
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 		memset(new_channel, 0, sizeof(struct channel_entry));
 		if(!chm->list_tail)
@@ -313,26 +315,22 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm){
 		chm->list_tail->next = new_channel;
 		new_channel->prev = chm->list_tail;
 	}
-	//memset(new_channel, 0, NAME_LEN+STR_PADD);
 	memcpy(new_channel->channel_name, name, NAME_LEN);
-	//memcpy(&new_client->clientaddr, clientaddr, sizeof(struct sockaddr_in));
 
 	/*Update list tail and number of clients*/
 	chm->list_tail = new_channel;
 	chm->num_channels++;
 	new_channel->num_clients = 0;
 
-	pthread_mutex_unlock(&lock2);
 	printf("[+] New channel (%s) created.\n", new_channel->channel_name);
-	//client_print(new_client);
 
+	pthread_rwlock_unlock(&channel_lock);
 	return new_channel;
 }
 
 int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 	//struct client_entry *client;
 
-	//if(!clientaddr){
 	if(!channel){
 		error_msg(client_err3);
 		return -1;
@@ -343,8 +341,8 @@ int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 	}
 
 	//client = client_search(clientaddr, client_list);
-	//client = client_test_search(name, clm);
-	pthread_mutex_lock(&lock2);
+
+	pthread_rwlock_wrlock(&channel_lock);
 	/*Unlink list node and update clm head or tail if unlinking head or tail*/
 	if(channel->next && channel->prev){
 		channel->next->prev = channel->prev;
@@ -358,20 +356,19 @@ int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 	}
 	if(chm->num_channels > 0)
 		chm->num_channels--;
-	pthread_mutex_unlock(&lock2);
 	puts("[+] Unlinked channel:");
-	//client_print(client);
-
 	//if(client->hostp)
 	//	free(client->hostp);
 	free(channel);
 
+	pthread_rwlock_unlock(&channel_lock);
 	return 0;
 }
 
 void channel_clean(struct _channel_manager *chm){
 	struct channel_entry *channel;
 
+	pthread_rwlock_wrlock(&channel_lock);
 	while(1){
 		if(!chm->list_head || chm->num_channels < 1)
 			break;
@@ -383,6 +380,8 @@ void channel_clean(struct _channel_manager *chm){
 		chm->num_channels--;
 	}
 	puts("[!] Channel list is clean.");
+
+	pthread_rwlock_unlock(&channel_lock);
 	return;
 }
 
@@ -392,7 +391,7 @@ int channel_add_client(struct client_entry *client, struct channel_entry *channe
 		error_msg(channel_err3);
 		return -1;
 	}
-	pthread_mutex_lock(&lock2);
+	pthread_rwlock_wrlock(&channel_lock);
 	/*Max number of clients per channel is actually 1 less than defined since the last array index needs to remain 0 for shifting during removal*/
 	if(channel->num_clients >= MAX_CHANNELCLIENTS-1){
 		error_msg(channel_err4);
@@ -401,10 +400,9 @@ int channel_add_client(struct client_entry *client, struct channel_entry *channe
 
 	channel->client_list[channel->num_clients] = client;
 	channel->num_clients++;
-	pthread_mutex_unlock(&lock2);
-
 	printf("[+] Channel (%s) accepted client (%s).\n", channel->channel_name, client->username);
 
+	pthread_rwlock_unlock(&channel_lock);
 	return 0;
 }
 
@@ -417,8 +415,10 @@ int channel_remove_client(struct client_entry *client, struct channel_entry *cha
 		error_msg(channel_err5);
 		return -1;
 	}
-	pthread_mutex_lock(&lock2);
+
+	pthread_rwlock_wrlock(&channel_lock);
 	if(channel->num_clients < 1){
+		pthread_rwlock_unlock(&channel_lock);
 		error_msg(channel_err6);
 		return -1;
 	}
@@ -436,8 +436,8 @@ int channel_remove_client(struct client_entry *client, struct channel_entry *cha
 		n++;
 	}
 	channel->num_clients--;
-	pthread_mutex_unlock(&lock2);
 
+	pthread_rwlock_unlock(&channel_lock);
 	return 0;
 }
 
