@@ -21,6 +21,7 @@ struct _client_info{
 	struct _channel_sub *list_head;
 	struct _channel_sub *list_tail;
 	struct _channel_sub *active_channel;
+	int num_channels;
 };
 
 
