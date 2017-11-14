@@ -152,6 +152,8 @@ void channel_clean(struct _client_info *cl){
 		free(channel);
 		cl->num_channels--;
 	}
+	cl->list_head = NULL;
+	cl->list_tail = NULL;
 	puts("[+] Sub channel is clean.");
 
 	return;

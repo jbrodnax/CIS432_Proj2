@@ -24,4 +24,9 @@ struct _client_info{
 	int num_channels;
 };
 
-
+struct _channel_sub *channel_search(char *name, struct _client_info *cl);
+struct _channel_sub *channel_switch(char *name, struct _client_info *cl);
+struct _channel_sub *channel_list_tail(struct _client_info *cl);
+struct _channel_sub *channel_add(char *name, struct _client_info *cl);
+int channel_remove(struct _channel_sub *channel, struct _client_info *cl);
+void channel_clean(struct _client_info *cl);

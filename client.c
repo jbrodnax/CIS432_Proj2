@@ -69,7 +69,12 @@ rid_t build_request(rid_t type, int argc, char **argv){
 			memcpy(output, &req_join, output_size);
 			return REQ_JOIN;
 		case REQ_LEAVE:
-			break;
+			output_size = sizeof(struct _req_leave);
+			memset(&req_leave, 0, output_size);
+			req_leave.type_id = REQ_LEAVE;
+			memcpy(req_leave.channel, argv[0], NAME_LEN);
+			memcpy(output, &req_leave, output_size);
+			return REQ_LEAVE;
 		case REQ_SAY:
 			active_channel_name = client_info.active_channel->channel_name;
 			output_size = sizeof(struct _req_say);
@@ -92,6 +97,7 @@ rid_t build_request(rid_t type, int argc, char **argv){
 }
 
 rid_t resolve_cmd(char *input, int cmd_offset){
+	struct _channel_sub *ch;
 	char *argv[1];
 	char channel_name[NAME_LEN+STR_PADD];
 	int i = 0;
@@ -100,21 +106,62 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 	cmd_offset++;
 	if(!memcmp(&input[cmd_offset], _CMD_EXIT, strlen(_CMD_EXIT))){
 		if(build_request(REQ_LOGOUT, 0, NULL) == REQ_LOGOUT){
-			send_data();
-			return REQ_LOGOUT;
+			if(send_data() > -1)
+				return REQ_LOGOUT;
+			else
+				return RET_FAILURE;
 		}
 	}
 	if(!memcmp(&input[cmd_offset], _CMD_JOIN, strlen(_CMD_JOIN))){
+		/*Locate channel name string*/
 		memset(channel_name, 0, (NAME_LEN+STR_PADD));
 		n = (cmd_offset + strlen(_CMD_JOIN));
-		while(input[n] < 0x21)
+		while(input[n] < 0x21 && n < BUFSIZE-1)
 			n++;
 		strncpy(channel_name, &input[n], NAME_LEN);
+		/*Attempt to add channel to sub list*/
+		if(!channel_add(channel_name, &client_info)){
+			return RET_FAILURE;
+		}
 		argv[0] = channel_name;
 		if(build_request(REQ_JOIN, 1, argv) == REQ_JOIN){
-			send_data();
-			return REQ_JOIN;
+			if(send_data() > -1){
+				return REQ_JOIN;
+			}else{
+				channel_remove(channel_search(channel_name, &client_info), &client_info);
+				return RET_FAILURE;
+			}
 		}
+	}
+	if(!memcmp(&input[cmd_offset], _CMD_LEAVE, strlen(_CMD_LEAVE))){
+		memset(channel_name, 0, (NAME_LEN+STR_PADD));
+		n = (cmd_offset + strlen(_CMD_LEAVE));
+		while(input[n] < 0x21 && n < BUFSIZE-1)
+			n++;
+		strncpy(channel_name, &input[n], NAME_LEN);
+		if((ch = channel_search(channel_name, &client_info)) == NULL)
+			return RET_FAILURE;
+		argv[0] = channel_name;
+		if(build_request(REQ_LEAVE, 1, argv) == REQ_LEAVE){
+			if(send_data() > -1){
+				channel_remove(ch, &client_info);
+				return REQ_LEAVE;
+			}else{
+				return RET_FAILURE;
+			}
+		}
+	}
+	if(!memcmp(&input[cmd_offset], _CMD_SWITCH, strlen(_CMD_SWITCH))){
+		memset(channel_name, 0, (NAME_LEN+STR_PADD));
+		n = (cmd_offset + strlen(_CMD_SWITCH));
+		while(input[n] < 0x21 && n < BUFSIZE-1)
+			n++;
+		strncpy(channel_name, &input[n], NAME_LEN);
+		//FIX: return val for switch command
+		if(channel_switch(channel_name, &client_info))
+			return 98;
+		else
+			return RET_FAILURE;
 	}
 
 	return RET_FAILURE;
@@ -138,12 +185,14 @@ void handle_user_input(char *input, int n){
 
 	if(is_cmd == 1){
 		if(resolve_cmd(input, cmd_offset) == REQ_LOGOUT){
+			channel_clean(&client_info);
 			free(input);
 			cooked_mode();
 			exit(EXIT_SUCCESS);
 		}
 	}else{
 		argv[0] = input;
+		//FIX: add error checking to the next two calls
 		build_request(REQ_SAY, 1, argv);
 		send_data();
 	}
