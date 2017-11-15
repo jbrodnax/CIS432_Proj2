@@ -143,6 +143,20 @@ void request_dequeue(struct _req_queue *thread_queue){
 	return;
 }
 
+int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd){
+	struct _rsp_err rsp_err;
+	int n;
+
+	memset(&rsp_err, 0, sizeof(struct _rsp_err));
+	rsp_err.type_id = RSP_ERR;
+	strncpy(rsp_err.message, errmsg, TEXT_LEN-1);
+	n = sendto(sockfd, &rsp_err, sizeof(struct _rsp_err), 0, (struct sockaddr*)clientaddr, sizeof(struct sockaddr));
+	if(n < 0)
+		perror("Error in sendto");
+
+	return 0;
+}
+
 void send_data(struct _queue_entry *entry, int sockfd){
 	int n, i;
 	struct channel_entry *ch;
