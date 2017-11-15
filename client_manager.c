@@ -25,6 +25,18 @@ void error_msg(char *err_msg){
 	return;
 }
 
+void init_rwlocks(){
+	int retval;
+	if(pthread_rwlock_init(&client_lock, NULL) != 0){
+		error_msg("failed to init client mutex lock.");
+		exit(EXIT_FAILURE);
+	}
+	if(pthread_rwlock_init(&channel_lock, NULL) != 0){
+		error_msg("failed to init channel mutex lock.");
+		exit(EXIT_FAILURE);
+	}
+}
+
 void client_print(struct client_entry *client){
 	if(client){
 		printf("[+] CLIENT-INFO:\n\tusername: %s\n", client->username);

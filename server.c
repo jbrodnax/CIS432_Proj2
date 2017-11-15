@@ -52,13 +52,23 @@ struct addrinfo hints, *servinfo, *p;
 pthread_t tid[1];
 pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 char init_channelname[]="Common";
+char ERR_MSG[TEXT_LEN];
 
 void error(char *msg){
 	perror(msg);
 	exit(1);
 }
 
+void sig_handler(int signo){
+	if(signo == SIGINT){
+		printf("SIGINT Caught.\n");
+		//FIX: implement clean up
+		exit(EXIT_SUCCESS);
+	}
+}
+
 void test_chm(){
+	init_rwlocks();
 	if(!channel_create(init_channelname, &channel_manager)){
 		fprintf(stderr, "[!] Error: Channel creation of (%s) failed.");
 		exit(EXIT_FAILURE);
@@ -169,8 +179,9 @@ void send_data(struct _queue_entry *entry, int sockfd){
 	if(entry->req_say){
 		ch = channel_search(entry->req_say->channel, &channel_manager);
 		if(!ch){
-			printf("[!] Error: channel (%s) does not exist.\n", entry->req_say->channel);
-			//send error rsp
+			memset(ERR_MSG, 0, TEXT_LEN);
+			snprintf(ERR_MSG, TEXT_LEN-1, "Channel (%s) does not exist.", entry->req_say->channel);
+			send_error(ERR_MSG, &entry->clientaddr, sockfd);
 			free(entry->req_say);
 			free(entry);
 			return;
@@ -181,7 +192,7 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		memcpy(rsp_say.username, entry->username, NAME_LEN);
 		memcpy(rsp_say.text, entry->req_say->text, TEXT_LEN);
 		for(i=0; i < ch->num_clients; i++){
-			printf("[+] Channel (%s) has (%d) clients.\n", ch->channel_name, ch->num_clients);
+			//printf("[+] Channel (%s) has (%d) clients.\n", ch->channel_name, ch->num_clients);
 			client = ch->client_list[i];
 			printf("[<] Sending Client (%s)\tData (%s)\ton Channel(%s)\tfrom User(%s)\n",
 				client->username, rsp_say.text, rsp_say.channel, rsp_say.username);
@@ -205,7 +216,9 @@ void send_data(struct _queue_entry *entry, int sockfd){
 	}else if(entry->req_who){
 		ch = channel_search(entry->req_who->channel, &channel_manager);
 		if(!ch){
-			printf("[!] Error: channel (%s) does not exist.\n", entry->req_who->channel);
+			memset(ERR_MSG, 0, TEXT_LEN);
+			snprintf(ERR_MSG, TEXT_LEN-1, "Channel (%s) does not exist.\n", entry->req_who->channel);
+			send_error(ERR_MSG, &entry->clientaddr, sockfd);
 			free(entry->req_who);
 			free(entry);
 			return;
@@ -215,7 +228,7 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		memcpy(rsp_who.channel, entry->req_who->channel, NAME_LEN);
 		if(channel_who(&rsp_who, ch) > -1){
 			i = (sizeof(struct _rsp_who) - ((WHO_LEN*NAME_LEN)-(rsp_who.num_users*NAME_LEN)));
-			printf("[+] Who request has (%hu) number of channels and response is of size (%d).\n", rsp_who.num_users, i);
+			//printf("[+] Who request has (%hu) number of channels and response is of size (%d).\n", rsp_who.num_users, i);
 			n = sendto(sockfd, &rsp_who, i, 0, (struct sockaddr *)&entry->clientaddr, sizeof(struct sockaddr));
 			if(n < 0)
 				perror("Error in sendto");
@@ -254,10 +267,10 @@ rid_t handle_request(char *data){
 	memcpy(&type, data, sizeof(rid_t));
 	client = client_search(&client_info.clientaddr, &client_manager);
 	if(client == NULL && type != REQ_LOGIN){
-		printf("[?] Issue: received non-login request from non-authenticated client\n");
+		send_error("You are not logged in yet.", &client_info.clientaddr, server_info.sockfd);
 		return REQ_INVALID;
 	}else if(client != NULL && type == REQ_LOGIN){
-		printf("[?] Issue: received login request from already authenticated client\n");
+		send_error("You are already logged in.", &client_info.clientaddr, server_info.sockfd);
 		return REQ_INVALID;
 	}
 
@@ -362,6 +375,7 @@ rid_t handle_request(char *data){
 			}
 			memset(req_list, 0, sizeof(struct _req_list));
 			req_list->type_id = REQ_LIST;
+			/*Enqueue request for sender thread*/
 			pthread_mutex_lock(&lock1);
 			if(main_queue.size < MAXQSIZE){
 				entry = malloc(sizeof(struct _queue_entry));
@@ -381,6 +395,7 @@ rid_t handle_request(char *data){
 			memset(req_who, 0, sizeof(struct _req_who));
 			req_who->type_id = REQ_WHO;
 			memcpy(req_who->channel, &data[sizeof(rid_t)], NAME_LEN);
+			/*Enqueue request for sender thread*/
 			pthread_mutex_lock(&lock1);
 			if(main_queue.size < MAXQSIZE){
 				entry = malloc(sizeof(struct _queue_entry));
@@ -471,6 +486,10 @@ int main(int argc, char *argv[]){
 	if(n < 1 || n > 5){
 		fprintf(stderr, "Error: received invalid 2nd argument (port number).\n");
 		exit(0);
+	}
+	if(signal(SIGINT, sig_handler) == SIG_ERR){
+		perror("Error in signal");
+		exit(EXIT_FAILURE);
 	}
 	memset(&server_info, 0, sizeof(struct _server_info));
 	server_info.portno = atoi(argv[2]);

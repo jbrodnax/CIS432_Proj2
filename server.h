@@ -31,6 +31,7 @@ struct _channel_manager{
 };
 
 /*client_manager.c function prototypes*/
+void init_rwlocks();
 void client_print(struct client_entry *client);
 struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _client_manager *clm);
 struct client_entry *client_init_list();
@@ -52,6 +53,7 @@ int channel_list(struct _rsp_list *rsp_list, struct _channel_manager *chm);
 int channel_who(struct _rsp_who *rsp_who, struct channel_entry *ch);
 
 /*server.c function prototypes*/
+int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd);
 void *thread_responder(void *vargp);
 void recvdata_IPv4();
 void recvdata_IPv6();
