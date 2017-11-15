@@ -39,7 +39,7 @@ int client_add_channel(struct channel_entry *channel, struct client_entry *clien
 int client_remove_channel(struct channel_entry *channel, struct client_entry *client);
 struct client_entry *client_list_tail(struct _client_manager *clm);
 struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, struct _client_manager *clm);
-int client_logout(struct client_entry *client, struct _client_manager *clm);
+int client_logout(struct client_entry *client, struct _client_manager *clm, struct _channel_manager *chm);
 int client_remove(struct client_entry *client, struct _client_manager *clm);
 void client_clean(struct _client_manager *clm);
 struct channel_entry *channel_search(char *name, struct _channel_manager *chm);

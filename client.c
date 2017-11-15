@@ -269,6 +269,11 @@ void handle_sock_input(int sockfd, char *input){
 			}
 			break;
 		case RSP_ERR:
+			memset(&rsp_err, 0, sizeof(struct _rsp_err));
+			memcpy(&rsp_err, buf, n);
+			memset(safe_text_buf, 0, (TEXT_LEN+STR_PADD));
+			memcpy(safe_text_buf, rsp_err.message, TEXT_LEN);
+			printf("[Server Error]: %s\n", safe_text_buf);
 			break;
 		default:
 			printf("[-] Error: received response with invalid type (%hu)\n", type);

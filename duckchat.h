@@ -26,6 +26,7 @@
 #define MAX_CHANNELCLIENTS	128
 #define MAXQSIZE	128
 #define MAXCMD_LEN	8
+#define LOGMSG_LEN	256
 /*Null-byte padding size for strings originating from user data*/
 #define STR_PADD	4
 

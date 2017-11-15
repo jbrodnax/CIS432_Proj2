@@ -53,6 +53,7 @@ pthread_t tid[1];
 pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 char init_channelname[]="Common";
 char ERR_MSG[TEXT_LEN];
+char *LOG_MSG;
 
 void error(char *msg){
 	perror(msg);
@@ -65,6 +66,12 @@ void sig_handler(int signo){
 		//FIX: implement clean up
 		exit(EXIT_SUCCESS);
 	}
+}
+
+void log_msg(){
+	printf("%s:%s\t%s\n", server_info.ipaddr_str, server_info.portno_str, LOG_MSG);
+	memset(LOG_MSG, 0, LOGMSG_LEN);
+	return;
 }
 
 void test_chm(){
@@ -194,8 +201,8 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		for(i=0; i < ch->num_clients; i++){
 			//printf("[+] Channel (%s) has (%d) clients.\n", ch->channel_name, ch->num_clients);
 			client = ch->client_list[i];
-			printf("[<] Sending Client (%s)\tData (%s)\ton Channel(%s)\tfrom User(%s)\n",
-				client->username, rsp_say.text, rsp_say.channel, rsp_say.username);
+			//printf("[<] Sending Client (%s)\tData (%s)\ton Channel(%s)\tfrom User(%s)\n",
+				//client->username, rsp_say.text, rsp_say.channel, rsp_say.username);
 			n = sendto(sockfd, &rsp_say, sizeof(struct _rsp_say), 0, (struct sockaddr *)&client->clientaddr, sizeof(struct sockaddr));
 			if(n < 0)
 				perror("Error in sendto");
@@ -207,7 +214,7 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		rsp_list.type_id = RSP_LIST;
 		if(channel_list(&rsp_list, &channel_manager) > -1){
 			i = (sizeof(struct _rsp_list) - ((LIST_LEN*NAME_LEN)-(rsp_list.num_channels*NAME_LEN)));
-			printf("[+] List request got (%hu) number of channels and response is of size (%d).\n", rsp_list.num_channels, i);
+			//printf("[+] List request got (%hu) number of channels and response is of size (%d).\n", rsp_list.num_channels, i);
 			n = sendto(sockfd, &rsp_list, i, 0, (struct sockaddr *)&entry->clientaddr, sizeof(struct sockaddr));
 			if(n < 0)
 				perror("Error in sendto");
@@ -262,6 +269,7 @@ rid_t handle_request(char *data){
 	struct channel_entry *channel;
 	struct _queue_entry *entry;
 	rid_t type;
+	int n;
 
 	/*Check if request came from authenticated client*/
 	memcpy(&type, data, sizeof(rid_t));
@@ -275,7 +283,7 @@ rid_t handle_request(char *data){
 	}
 
 	switch(type){
-		case REQ_LOGIN:
+		case REQ_LOGIN:	
 			if(!(req_login = malloc(sizeof(struct _req_login)))){
 				perror("Error in malloc");
 				exit(1);
@@ -284,12 +292,17 @@ rid_t handle_request(char *data){
 			req_login->type_id = REQ_LOGIN;
 			//FIX: remove the -1 from NAME_LEN once client login is implemented
 			memcpy(req_login->username, &data[sizeof(rid_t)], NAME_LEN-1);
-			printf("[>] Login request from: (%s)\n", req_login->username);
+			snprintf(LOG_MSG, LOGMSG_LEN, "%s:%s\trecv Request Login %s", client_info.ipaddr_str, client_info.portno_str, req_login->username);
+			log_msg();
+			//printf("[>] Login request from: (%s)\n", req_login->username);
 			client_add(req_login->username, &client_info.clientaddr, &client_manager);
+
 			free(req_login);
 			return REQ_LOGIN;
 		case REQ_LOGOUT:
-			client_logout(client, &client_manager);
+			snprintf(LOG_MSG, LOGMSG_LEN, "%s:%s\trecv Request Logout %s", client_info.ipaddr_str, client_info.portno_str, client->username);
+			log_msg();
+			client_logout(client, &client_manager, &channel_manager);
 			return REQ_LOGOUT;
 		case REQ_JOIN:
 			if(!(req_join = malloc(sizeof(struct _req_join)))){
@@ -300,26 +313,34 @@ rid_t handle_request(char *data){
 			req_join->type_id = REQ_JOIN;
 			//FIX: remove -1 on NAME_LEN
 			memcpy(req_join->channel, &data[sizeof(rid_t)], NAME_LEN-1);
-			printf("[>] Join request from (%s) for channel (%s)\n", client->username, req_join->channel);
+			snprintf(LOG_MSG, LOGMSG_LEN, "%s:%s\trecv Request Join %s %s", client_info.ipaddr_str, client_info.portno_str, client->username, req_join->channel);
+			log_msg();
+			//printf("[>] Join request from (%s) for channel (%s)\n", client->username, req_join->channel);
 			
 			channel = channel_search(req_join->channel, &channel_manager);
 			if(!channel){
 				channel = channel_create(req_join->channel, &channel_manager);
 				if(!channel){
+					send_error("join request failed.", &client_info.clientaddr, server_info.sockfd);
 					free(req_join);
 					break;
 				}
 			}
+			n = client_add_channel(channel, client);
+			/*Only send error message if client_add_channel return with an error e.g. -1*/
+			if(n < 0)
+				send_error("join request failed.", &client_info.clientaddr, server_info.sockfd);	
+			if(n != 0){
+				free(req_join);
+				break;
+			}
 			if(channel_add_client(client, channel) != 0){
+				send_error("join request failed.", &client_info.clientaddr, server_info.sockfd);
 				free(req_join);
 				break;
 			}
-			if(client_add_channel(channel, client) != 0){
-				free(req_join);
-				break;
-			}
+
 			free(req_join);
-			
 			return REQ_JOIN;
 		case REQ_LEAVE:
 			if(!(req_leave = malloc(sizeof(struct _req_leave)))){
@@ -329,18 +350,26 @@ rid_t handle_request(char *data){
 			memset(req_leave, 0, sizeof(struct _req_leave));
 			req_leave->type_id = REQ_LEAVE;
 			memcpy(req_leave->channel, &data[sizeof(rid_t)], NAME_LEN-1);
-			printf("[>] Leave request from (%s) for channel (%s)\n", client->username, req_leave->channel);
+			snprintf(LOG_MSG, LOGMSG_LEN, "%s:%s\trecv Request Leave %s %s", client_info.ipaddr_str, client_info.portno_str, client->username, req_leave->channel);
+			log_msg();
+			//printf("[>] Leave request from (%s) for channel (%s)\n", client->username, req_leave->channel);
 
 			channel = channel_search(req_leave->channel, &channel_manager);
 			if(!channel){
-				//FIX: send error msg to client
-				printf("[?] Error: channel (%s) not found.\n", req_leave->channel);
+				send_error("channel not found for leave request.", &client_info.clientaddr, server_info.sockfd);
 				free(req_leave);
 				return REQ_INVALID;
 			}
 			client_remove_channel(channel, client);
 			channel_remove_client(client, channel);
+			/*Check if channel is empty*/
+			if(channel->num_clients < 1){
+				if(channel_remove(channel, &channel_manager) != 0){
+					printf("[?] Error: failed to remove empty channel (%s).\n", channel->channel_name);
+				}
+			}
 
+			free(req_leave);
 			return REQ_LEAVE;
 		case REQ_SAY:
 			if(!(req_say = malloc(sizeof(struct _req_say)))){
@@ -352,7 +381,9 @@ rid_t handle_request(char *data){
 			//FIX: remove -1 on NAME_LEN
 			memcpy(req_say->channel, &data[sizeof(rid_t)], NAME_LEN-1);
 			memcpy(req_say->text, &data[(sizeof(rid_t)+NAME_LEN)], TEXT_LEN-1);
-			printf("[>] Say request from (%s) for channel: (%s)\n\tMessage: %s\n", client->username, req_say->channel, req_say->text);
+			snprintf(LOG_MSG, LOGMSG_LEN, "%s:%s\trecv Request Say %s %s", client_info.ipaddr_str, client_info.portno_str, req_say->channel, req_say->text);
+			log_msg();
+			//printf("[>] Say request from (%s) for channel: (%s)\n\tMessage: %s\n", client->username, req_say->channel, req_say->text);
 			/*Enqueue request for sender thread*/
 			pthread_mutex_lock(&lock1);
 			if(main_queue.size < MAXQSIZE){
@@ -375,6 +406,8 @@ rid_t handle_request(char *data){
 			}
 			memset(req_list, 0, sizeof(struct _req_list));
 			req_list->type_id = REQ_LIST;
+			snprintf(LOG_MSG, LOGMSG_LEN, "%s:%s\trecv Request List %s", client_info.ipaddr_str, client_info.portno_str, client->username);
+			log_msg();
 			/*Enqueue request for sender thread*/
 			pthread_mutex_lock(&lock1);
 			if(main_queue.size < MAXQSIZE){
@@ -394,7 +427,9 @@ rid_t handle_request(char *data){
 			}
 			memset(req_who, 0, sizeof(struct _req_who));
 			req_who->type_id = REQ_WHO;
-			memcpy(req_who->channel, &data[sizeof(rid_t)], NAME_LEN);
+			memcpy(req_who->channel, &data[sizeof(rid_t)], NAME_LEN-1);
+			snprintf(LOG_MSG, LOGMSG_LEN, "%s:%s\trecv Request Who %s %s", client_info.ipaddr_str, client_info.portno_str, client->username, req_who->channel);
+			log_msg();
 			/*Enqueue request for sender thread*/
 			pthread_mutex_lock(&lock1);
 			if(main_queue.size < MAXQSIZE){
@@ -436,7 +471,7 @@ void recvdata_IPv6(){
 		}
 		getnameinfo((struct sockaddr*)&client_info.clientaddr6, sizeof(struct sockaddr), 
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
-		printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
+		//printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
 		handle_request(input);	
 	}
 
@@ -465,7 +500,7 @@ void recvdata_IPv4(){
 
 		getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), 
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
-		printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
+		//printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
 		handle_request(input);
 	}
 
@@ -495,6 +530,11 @@ int main(int argc, char *argv[]){
 	server_info.portno = atoi(argv[2]);
 	memcpy(server_info.portno_str, argv[2], n);
 	server_info.hostname = argv[1];
+	LOG_MSG = malloc(LOGMSG_LEN);
+	if(!LOG_MSG){
+		perror("Error in malloc");
+		exit(EXIT_FAILURE);
+	}
 	init_server();
 
 	return 0;

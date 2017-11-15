@@ -81,7 +81,7 @@ struct _channel_sub *channel_add(char *name, struct _client_info *cl){
 	}
 	new_ch = channel_search(name, cl);
 	if(new_ch){
-		printf("Already subscribed to channel (%s).", name);
+		//printf("Already subscribed to channel (%s).", name);
 		return new_ch;
 	}
 	/*If list_head is empty, assume client is not subscribed to any channels. list is empty*/
