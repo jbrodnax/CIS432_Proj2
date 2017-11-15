@@ -48,7 +48,7 @@ int send_data(){
 	return 0;
 }
 
-rid_t build_request(rid_t type, int argc, char **argv){
+rid_t build_request(rid_t type, int argc, char *argv[]){
 	char *active_channel_name;
 
 	memset(output, 0, (BUFSIZE+STR_PADD));
@@ -70,14 +70,14 @@ rid_t build_request(rid_t type, int argc, char **argv){
 			output_size = sizeof(struct _req_join);
 			memset(&req_join, 0, output_size);
 			req_join.type_id = REQ_JOIN;
-			memcpy(req_join.channel, argv[0], NAME_LEN);
+			memcpy(req_join.channel, argv[1], NAME_LEN);
 			memcpy(output, &req_join, output_size);
 			return REQ_JOIN;
 		case REQ_LEAVE:
 			output_size = sizeof(struct _req_leave);
 			memset(&req_leave, 0, output_size);
 			req_leave.type_id = REQ_LEAVE;
-			memcpy(req_leave.channel, argv[0], NAME_LEN);
+			memcpy(req_leave.channel, argv[1], NAME_LEN);
 			memcpy(output, &req_leave, output_size);
 			return REQ_LEAVE;
 		case REQ_SAY:
@@ -101,7 +101,7 @@ rid_t build_request(rid_t type, int argc, char **argv){
 			output_size = sizeof(struct _req_who);
 			memset(&req_who, 0, output_size);
 			req_who.type_id = REQ_WHO;
-			memcpy(req_who.channel, argv[0], NAME_LEN);
+			memcpy(req_who.channel, argv[1], NAME_LEN);
 			memcpy(output, &req_who, output_size);
 			return REQ_WHO;
 		case REQ_ALIVE:
@@ -112,15 +112,13 @@ rid_t build_request(rid_t type, int argc, char **argv){
 	return RET_FAILURE;
 }
 
-rid_t resolve_cmd(char *input, int cmd_offset){
+rid_t resolve_cmd(int argc, char *argv[]){
 	struct _channel_sub *ch;
-	char *argv[1];
 	char channel_name[NAME_LEN+STR_PADD];
 	int i = 0;
 	int n;
 
-	cmd_offset++;
-	if(!memcmp(&input[cmd_offset], _CMD_EXIT, strlen(_CMD_EXIT))){
+	if(!memcmp(argv[0], _CMD_EXIT, strlen(_CMD_EXIT))){
 		if(build_request(REQ_LOGOUT, 0, NULL) == REQ_LOGOUT){
 			if(send_data() > -1)
 				return REQ_LOGOUT;
@@ -128,18 +126,13 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 				return RET_FAILURE;
 		}
 	}
-	else if(!memcmp(&input[cmd_offset], _CMD_JOIN, strlen(_CMD_JOIN))){
-		/*Locate channel name string*/
+	else if(!memcmp(argv[0], _CMD_JOIN, strlen(_CMD_JOIN))){	
 		memset(channel_name, 0, (NAME_LEN+STR_PADD));
-		n = (cmd_offset + strlen(_CMD_JOIN));
-		while(input[n] < 0x21 && n < BUFSIZE-1)
-			n++;
-		strncpy(channel_name, &input[n], NAME_LEN);
+		memcpy(channel_name, argv[1], NAME_LEN);
 		/*Attempt to add channel to sub list*/
 		if(!channel_add(channel_name, &client_info)){
 			return RET_FAILURE;
 		}
-		argv[0] = channel_name;
 		if(build_request(REQ_JOIN, 1, argv) == REQ_JOIN){
 			if(send_data() > -1){
 				return REQ_JOIN;
@@ -149,15 +142,11 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 			}
 		}
 	}
-	else if(!memcmp(&input[cmd_offset], _CMD_LEAVE, strlen(_CMD_LEAVE))){
+	else if(!memcmp(argv[0], _CMD_LEAVE, strlen(_CMD_LEAVE))){
 		memset(channel_name, 0, (NAME_LEN+STR_PADD));
-		n = (cmd_offset + strlen(_CMD_LEAVE));
-		while(input[n] < 0x21 && n < BUFSIZE-1)
-			n++;
-		strncpy(channel_name, &input[n], NAME_LEN);
+		memcpy(channel_name, argv[1], NAME_LEN);
 		if((ch = channel_search(channel_name, &client_info)) == NULL)
 			return RET_FAILURE;
-		argv[0] = channel_name;
 		if(build_request(REQ_LEAVE, 1, argv) == REQ_LEAVE){
 			if(send_data() > -1){
 				channel_remove(ch, &client_info);
@@ -167,19 +156,16 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 			}
 		}
 	}
-	else if(!memcmp(&input[cmd_offset], _CMD_SWITCH, strlen(_CMD_SWITCH))){
+	else if(!memcmp(argv[0], _CMD_SWITCH, strlen(_CMD_SWITCH))){
 		memset(channel_name, 0, (NAME_LEN+STR_PADD));
-		n = (cmd_offset + strlen(_CMD_SWITCH));
-		while(input[n] < 0x21 && n < BUFSIZE-1)
-			n++;
-		strncpy(channel_name, &input[n], NAME_LEN);
+		memcpy(channel_name, argv[1], NAME_LEN);
 		//FIX: return val for switch command
 		if(channel_switch(channel_name, &client_info))
 			return 98;
 		else
 			return RET_FAILURE;
 	}
-	else if(!memcmp(&input[cmd_offset], _CMD_LIST, strlen(_CMD_LIST))){
+	else if(!memcmp(argv[0], _CMD_LIST, strlen(_CMD_LIST))){
 		if(build_request(REQ_LIST, 0, NULL) == REQ_LIST){
 			if(send_data() > -1)
 				return REQ_LIST;
@@ -187,15 +173,9 @@ rid_t resolve_cmd(char *input, int cmd_offset){
 				return RET_FAILURE;
 		}
 	}
-	else if(!memcmp(&input[cmd_offset], _CMD_WHO, strlen(_CMD_WHO))){
+	else if(!memcmp(argv[0], _CMD_WHO, strlen(_CMD_WHO))){
 		memset(channel_name, 0, (NAME_LEN+STR_PADD));
-                n = (cmd_offset + strlen(_CMD_LEAVE));
-                while(input[n] < 0x21 && n < BUFSIZE-1)
-                        n++;
-                strncpy(channel_name, &input[n], NAME_LEN);
-                if((ch = channel_search(channel_name, &client_info)) == NULL)
-                        return RET_FAILURE;
-                argv[0] = channel_name;
+                memcpy(channel_name, argv[1], NAME_LEN);
 		if(build_request(REQ_WHO, 1, argv) == REQ_WHO){
 			if(send_data() > -1)
 				return REQ_WHO;
@@ -293,7 +273,7 @@ void handle_sock_input(int sockfd, char *input){
 		default:
 			printf("[-] Error: received response with invalid type (%hu)\n", type);
 	}
-	/*Restore prompt and user input*/
+	/*Restore user prompt*/
 	l = strlen(input);
 	write(1, PROMPT_SYM, strlen(PROMPT_SYM));
 	for(i=0; i < l; i++)
@@ -302,36 +282,89 @@ void handle_sock_input(int sockfd, char *input){
 	return;
 }
 
-void handle_user_input(char *input, int n){
-	char *argv[1];
-	int i = 0;
-	int cmd_offset = 0;
-	int is_cmd = 0;
+void sanitize_input(char *input, int n){
+	int i;
 
-	while(i < n){
-		if(input[i] == 0x2f && is_cmd == 0){
-			is_cmd = 1;
-			cmd_offset = i;
-		}else if(input[i] < 0x20 || input[i] > 0x7e){
+	for(i=0; i < n; i++){
+		if(input[i] < 0x20 || input[i] > 0x7e){
 			input[i] = 0x00;
 		}
+	}
+
+	return;
+}
+
+void handle_user_input(char *input, int n){
+	char *argv[2];
+	char cmd_name[MAXCMD_LEN+STR_PADD];
+	char cmd_arg1[NAME_LEN+STR_PADD];
+	char c;
+	int j;
+	int i = 0;
+
+	/*Eat any leading spaces*/
+	while(input[i] == 0x20){
 		i++;
+		if(i > BUFSIZE)
+			break;	
 	}
-
-	if(is_cmd == 1){
-		if(resolve_cmd(input, cmd_offset) == REQ_LOGOUT){
-			channel_clean(&client_info);
-			free(input);
-			cooked_mode();
-			exit(EXIT_SUCCESS);
+	/*if 1st non-space character is '/' then treat input as a command*/
+	if(input[i] == 0x2f){	
+		memset(cmd_name, 0, (MAXCMD_LEN+STR_PADD));
+		i++;
+		j = 0;
+		/*Copy chars following '/' until non-alphabet char or length exceeds MAXCMD_LEN*/
+		sanitize_input(input, n);
+		while(1){
+			if(input[i] < 0x41 || input[i] > 0x7a)
+				break;
+			cmd_name[j] = input[i];
+			i++;
+			j++;
+			if(j > MAXCMD_LEN){
+				printf("[-] Invalid command\n");
+				return;
+			}
 		}
-	}else{
-		argv[0] = input;
-		//FIX: add error checking to the next two calls
-		build_request(REQ_SAY, 1, argv);
-		send_data();
+		/*Assume command has no arguments*/
+		if(input[i] == 0x00){
+			argv[0] = cmd_name;	
+			if(resolve_cmd(1, argv) == REQ_LOGOUT){
+				channel_clean(&client_info);
+				free(input);
+				cooked_mode();
+				exit(EXIT_SUCCESS);
+			}else{
+				return;
+			}
+		}else if(input[i] == 0x20){
+			i++;
+			/*Get strlen of command arg*/
+			j = strlen(&input[i]);
+			if(j > NAME_LEN || j < 1){
+				printf("[-] Invalid command argument\n");
+				return;
+			}
+			strncpy(cmd_arg1, &input[i], j);
+			argv[0] = cmd_name;
+			argv[1] = cmd_arg1;	
+			if(resolve_cmd(2, argv) == RET_FAILURE)
+				printf("[-] Command failure!\n");
+			return;
+		}else{
+			printf("[-] Invalid command\n");
+			return;
+		}
 	}
 
+	sanitize_input(input, n);
+	argv[0] = input;
+	if(build_request(REQ_SAY, 1, argv) == REQ_SAY){
+		if(send_data() > -1)
+			return;
+	}
+
+	printf("[-] Failed to send message!\n");
 	return;
 }
 
@@ -393,7 +426,7 @@ void user_prompt(){
 }
 
 int init_login(){
-	char *argv[1];
+	char *argv[2];
 	char channel_name[]="Common";
 
 	if(build_request(REQ_LOGIN, 0, NULL) != REQ_LOGIN){
@@ -403,7 +436,8 @@ int init_login(){
 	if(send_data() < 0)
 		return -1;
 
-	argv[0] = channel_name;
+	argv[0] = NULL;
+	argv[1] = channel_name;
 	if(build_request(REQ_JOIN, 1, argv) != REQ_JOIN){
 		fprintf(stderr, "Error: init_login failed to build join request\n.");
 		return -1;

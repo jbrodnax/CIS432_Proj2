@@ -34,7 +34,7 @@ struct _channel_sub *channel_search(char *name, struct _client_info *cl){
 		}
 		ch = ch->next;
 	}
-	printf("[-] Channel (%s) not found.\n", name);
+	//printf("[-] Channel (%s) not found.\n", name);
 
 	return NULL;
 }
@@ -109,7 +109,7 @@ struct _channel_sub *channel_add(char *name, struct _client_info *cl){
 	strncpy(new_ch->channel_name, name, NAME_LEN);
 	cl->list_tail = new_ch;
 	cl->num_channels++;
-	printf("[+] Now subscribbed to channel (%s).\n", new_ch->channel_name);
+	//printf("[+] Now subscribbed to channel (%s).\n", new_ch->channel_name);
 
 	return new_ch;
 }
@@ -133,7 +133,7 @@ int channel_remove(struct _channel_sub *channel, struct _client_info *cl){
 	}
 	if(cl->num_channels > 0)
 		cl->num_channels--;
-	printf("[+] Unlinked channel (%s).\n", channel->channel_name);
+	//printf("[+] Unlinked channel (%s).\n", channel->channel_name);
 	free(channel);
 
 	return 0;
@@ -147,13 +147,13 @@ void channel_clean(struct _client_info *cl){
 			break;
 		channel = cl->list_head;
 		cl->list_head = channel->next;
-		printf("[+] Freeing channel (%s).\n", channel->channel_name);
+		//printf("[+] Freeing channel (%s).\n", channel->channel_name);
 		free(channel);
 		cl->num_channels--;
 	}
 	cl->list_head = NULL;
 	cl->list_tail = NULL;
-	puts("[+] Sub channel is clean.");
+	//puts("[+] Sub channel is clean.");
 
 	return;
 }
