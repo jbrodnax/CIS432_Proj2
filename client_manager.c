@@ -17,11 +17,11 @@ pthread_rwlock_t client_lock;
 
 void error_msg(char *err_msg){
 	if(!err_msg){
-		perror("[-] ERROR:\n\t ");
+		perror("[-] ERROR:\t ");
 		return;
 	}
 
-	printf("[-] ERROR:\n\t %s\n", err_msg);
+	printf("[-] ERROR:\t %s\n", err_msg);
 	return;
 }
 
@@ -114,7 +114,7 @@ int client_remove_channel(struct channel_entry *channel, struct client_entry *cl
 	while(n < client->num_channels){
 		current = client->channel_list[n];
 		if(!memcmp(current->channel_name, channel->channel_name, NAME_LEN)){
-			printf("[-] Client (%s) removed from channel (%s).\n", client->username, channel->channel_name);
+			//printf("[-] Client (%s) removed from channel (%s).\n", client->username, channel->channel_name);
 			break;
 		}
 		n++;
@@ -198,11 +198,8 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 	return new_client;	
 }
 
-//int client_remove(struct sockaddr_in *clientaddr, struct client_entry *client_list){
 int client_remove(struct client_entry *client, struct _client_manager *clm){
-	//struct client_entry *client;
 
-	//if(!clientaddr){
 	if(!client){
 		error_msg(client_err3);
 		return -1;
@@ -211,8 +208,6 @@ int client_remove(struct client_entry *client, struct _client_manager *clm){
 		error_msg(client_err4);
 		return -1;
 	}
-
-	//client = client_search(clientaddr, client_list);
 
 	/*Unlink list node and update clm head or tail if unlinking head or tail*/
 	pthread_rwlock_wrlock(&client_lock);
@@ -226,13 +221,12 @@ int client_remove(struct client_entry *client, struct _client_manager *clm){
 		clm->list_tail = client->prev;
 		client->prev->next = NULL;
 	}
-	clm->num_clients--;
+	if(clm->num_clients > 0)
+		clm->num_clients--;
 	
 	//puts("[+] Unlinked client:");
-	client_print(client);
+	//client_print(client);
 
-	//if(client->hostp)
-	//	free(client->hostp);
 	free(client);
 
 	pthread_rwlock_unlock(&client_lock);
