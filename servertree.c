@@ -93,9 +93,52 @@ int node_remove(struct _adjacent_server *node, struct _server_manager *svm){
 	return 0;
 }
 
+struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _server_manager *svm){
+	struct _adjacent_server *node;
+	int n;
 
+	if(!serveraddr || !svm){
+		error_msg("node_search received null argument.");
+		return NULL;
+	}
 
+	for(n=0; n < svm->tree_size; n++){
+		node = svm->tree[n];
+		if(!node)
+			continue;
+		if(serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
+			if(serveraddr->sin_port == node->serveraddr->sin_port){
+				return node;
+			}
+		}
+	}
 
+	return NULL;
+}
+
+unique_t generate_id(struct _S2S_say *req){
+	unique_t id;
+	FILE *fp;
+
+	if(!req){
+		error_msg("generate_id received null request pointer.");
+		return 0;
+	}
+
+	if(!(fp = fopen("/dev/urandom", "r"))){
+		perror("Error reading from /dev/urandom");
+		exit(EXIT_FAILURE);
+	}
+	if(!(fread(&id, sizeof(unique_t), 1, fp))){
+		perror("Error reading from /dev/urandom");
+                exit(EXIT_FAILURE);
+	}
+	fclose(fp);
+
+	req->msg_id = id;
+	printf("generated id: %llu\n", id);
+	return id;
+}
 
 
 

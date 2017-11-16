@@ -41,7 +41,10 @@
 #define REQ_LIST	5
 #define REQ_WHO		6
 #define REQ_ALIVE	7
-#define REQ_INVALID	8	//This is not used as a request type, just as a return value for invalid client requests
+#define S2S_JOIN	8
+#define S2S_LEAVE	9
+#define S2S_SAY		10
+#define REQ_INVALID	11	//This is not used as a request type, just as a return value for invalid client requests
 /*Define response types sent from server to client*/
 #define RSP_SAY		0
 #define RSP_LIST	1

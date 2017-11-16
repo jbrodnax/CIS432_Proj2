@@ -1,6 +1,25 @@
 #include "duckchat.h"
 
 #define TREE_MAX 16
+typedef uint64_t unique_t;
+
+struct __attribute__((packed)) _S2S_join{
+	rid_t type_id;
+	char channel[NAME_LEN];
+};
+
+struct __attribute__((packed)) _S2S_leave{
+	rid_t type_id;
+	char channel[NAME_LEN];
+};
+
+struct __attribute__((packed)) _S2S_say{
+	rid_t type_id;
+	unique_t msg_id;
+	char username[NAME_LEN];
+	char channel[NAME_LEN];
+	char text[TEXT_LEN];
+};
 
 struct _adjacent_server{
 	struct sockaddr_in *serveraddr;
@@ -77,6 +96,8 @@ int channel_who(struct _rsp_who *rsp_who, struct channel_entry *ch);
 struct _adjacent_server *node_create(char *hostname, char *port, struct _server_manager *svm);
 int node_add(struct _adjacent_server *node, struct _server_manager *svm);
 int node_remove(struct _adjacent_server *node, struct _server_manager *svm);
+struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _server_manager *svm);
+unique_t generate_id(struct _S2S_say *req);
 
 /*server.c function prototypes*/
 int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd);

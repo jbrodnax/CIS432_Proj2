@@ -43,6 +43,10 @@ struct _req_who* req_who;
 struct _req_alive* req_alive;
 struct _req_queue main_queue;
 
+struct _S2S_join *s2s_join;
+struct _S2S_leave *s2s_leave;
+struct _S2S_say *s2s_say;
+
 struct _client_manager client_manager;
 struct _channel_manager channel_manager;
 struct _server_info server_info;
@@ -601,6 +605,11 @@ int main(int argc, char *argv[]){
 	}
 	init_server();
 	init_servertree(argc, argv);
+	s2s_say = malloc(sizeof(struct _S2S_say));
+	for(n=0; n<4; n++){
+		memset(s2s_say, 0, sizeof(struct _S2S_say));
+		generate_id(s2s_say);
+	}
 	/*
 	test_chm();
 	switch (p->ai_family){
