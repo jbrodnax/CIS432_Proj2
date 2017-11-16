@@ -25,10 +25,13 @@ struct _rsp_err rsp_err;
 
 struct _server_info server_info;
 struct _client_info client_info;
+
 char output[BUFSIZE+STR_PADD];
 size_t output_size;
 int sockfd;
 fd_set fds;
+pthread_t tid[1];
+pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 
 int send_data(){
 	int n, serverlen;
@@ -44,8 +47,32 @@ int send_data(){
 		perror("[!] Error in sendto");
 		return -1;
 	}
-	//printf("Message sent (size: %d)\n", n);
+
+	pthread_mutex_lock(&lock1);
+	client_info.timestamp = time(NULL);
+	pthread_mutex_unlock(&lock1);
 	return 0;
+}
+
+void *thread_keepalive(void *vargp){
+	int n, serverlen;
+	time_t current_time;
+
+	serverlen = sizeof(struct sockaddr);
+	while(1){
+		sleep(CSS_TIMEOUT);
+		pthread_mutex_lock(&lock1);
+		current_time = time(NULL);
+		if((current_time - client_info.timestamp) >= CSS_TIMEOUT){
+			req_alive.type_id = REQ_ALIVE;
+			n = sendto(sockfd, &req_alive, sizeof(struct _req_alive), 0, (struct sockaddr *)&server_info.serveraddr, serverlen);
+			if(n < 0){	
+				perror("Error in sendto");
+				exit(EXIT_FAILURE);
+			}
+		}
+		pthread_mutex_unlock(&lock1);
+	}
 }
 
 rid_t build_request(rid_t type, int argc, char *argv[]){
@@ -452,6 +479,8 @@ int init_login(){
 	client_info.active_channel = channel_add(channel_name, &client_info);
 	if(!client_info.active_channel)
 		return -1;
+
+	pthread_create(&tid[0], NULL, thread_keepalive, NULL);
 
 	return 0;
 }

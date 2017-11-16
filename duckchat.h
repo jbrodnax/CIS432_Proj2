@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <netdb.h>
 #include <limits.h>
 #include <sys/types.h>
@@ -27,6 +28,7 @@
 #define MAXQSIZE	128
 #define MAXCMD_LEN	8
 #define LOGMSG_LEN	256
+#define SS_TIMEOUT	30
 /*Null-byte padding size for strings originating from user data*/
 #define STR_PADD	4
 

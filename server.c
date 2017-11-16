@@ -49,12 +49,13 @@ struct _server_info server_info;
 struct _client_info client_info;
 struct addrinfo hints, *servinfo, *p;
 
-pthread_t tid[1];
+pthread_t tid[2];
 pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 char init_channelname[]="Common";
 char ERR_MSG[TEXT_LEN];
 char *LOG_RECV;
 char *LOG_SEND;
+time_t timestamp;
 
 void error(char *msg){
 	perror(msg);
@@ -94,6 +95,7 @@ void init_server(){
 	int rv, optval;
 	void *ptr;
 
+	printf("Initializing DuckChat Server...\n");
 	/*Zero-out all global structs*/
 	memset(&client_manager, 0, sizeof(struct _client_manager));
 	memset(&channel_manager, 0, sizeof(struct _channel_manager));
@@ -104,7 +106,7 @@ void init_server(){
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	printf("[+] Getting address info for:\n\tHostname: %s\n\tPort: %s\n\n", server_info.hostname, server_info.portno_str);
+	//printf("Server's hostname:port => %s:%s\n", server_info.hostname, server_info.portno_str);
 	if((rv = getaddrinfo(server_info.hostname, server_info.portno_str, &hints, &servinfo)) != 0){
 		fprintf(stderr, "in getaddrinfo: %s\n", gai_strerror(rv));
 		exit(1);
@@ -132,10 +134,10 @@ void init_server(){
 	test_chm();
 	switch (p->ai_family){
 		case AF_INET:
-			puts("ai_family IPv4");
 			server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;
 			/*Create response thread*/
 			pthread_create(&tid[0], NULL, thread_responder, NULL);
+			pthread_create(&tid[1], NULL, thread_softstate, NULL);
 			recvdata_IPv4();
 			break;
 		case AF_INET6:
@@ -215,12 +217,8 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		memcpy(rsp_say.channel, entry->req_say->channel, NAME_LEN);
 		memcpy(rsp_say.username, entry->username, NAME_LEN);
 		memcpy(rsp_say.text, entry->req_say->text, TEXT_LEN);
-		for(i=0; i < ch->num_clients; i++){
-			//printf("[+] Channel (%s) has (%d) clients.\n", ch->channel_name, ch->num_clients);
-			client = ch->client_list[i];
-			getnameinfo((struct sockaddr*)&client->clientaddr, sizeof(struct sockaddr), ipaddr, 128, portno, 32, NI_NUMERICHOST | NI_NUMERICSERV);
-			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s send Response Say %s %s %s", ipaddr, portno, rsp_say.username, rsp_say.channel, rsp_say.text);
-			log_send();
+		for(i=0; i < ch->num_clients; i++){	
+			client = ch->client_list[i];	
 			//printf("[<] Sending Client (%s)\tData (%s)\ton Channel(%s)\tfrom User(%s)\n",
 				//client->username, rsp_say.text, rsp_say.channel, rsp_say.username);
 			n = sendto(sockfd, &rsp_say, sizeof(struct _rsp_say), 0, (struct sockaddr *)&client->clientaddr, sizeof(struct sockaddr));
@@ -233,9 +231,7 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		memset(&rsp_list, 0, sizeof(struct _rsp_list));
 		rsp_list.type_id = RSP_LIST;
 		if(channel_list(&rsp_list, &channel_manager) > -1){
-			i = (sizeof(struct _rsp_list) - ((LIST_LEN*NAME_LEN)-(rsp_list.num_channels*NAME_LEN)));
-			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s send Response List", ipaddr, portno);
-			log_send();
+			i = (sizeof(struct _rsp_list) - ((LIST_LEN*NAME_LEN)-(rsp_list.num_channels*NAME_LEN)));	
 			//printf("[+] List request got (%hu) number of channels and response is of size (%d).\n", rsp_list.num_channels, i);
 			n = sendto(sockfd, &rsp_list, i, 0, (struct sockaddr *)&entry->clientaddr, sizeof(struct sockaddr));
 			if(n < 0)
@@ -256,9 +252,7 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		rsp_who.type_id = RSP_WHO;
 		memcpy(rsp_who.channel, entry->req_who->channel, NAME_LEN);
 		if(channel_who(&rsp_who, ch) > -1){
-			i = (sizeof(struct _rsp_who) - ((WHO_LEN*NAME_LEN)-(rsp_who.num_users*NAME_LEN)));
-			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s send Response Who", ipaddr, portno);
-			log_send();
+			i = (sizeof(struct _rsp_who) - ((WHO_LEN*NAME_LEN)-(rsp_who.num_users*NAME_LEN)));	
 			//printf("[+] Who request has (%hu) number of channels and response is of size (%d).\n", rsp_who.num_users, i);
 			n = sendto(sockfd, &rsp_who, i, 0, (struct sockaddr *)&entry->clientaddr, sizeof(struct sockaddr));
 			if(n < 0)
@@ -274,9 +268,12 @@ void send_data(struct _queue_entry *entry, int sockfd){
 
 void *thread_responder(void *vargp){
 	int t_sockfd, i;
+	time_t current_time;
+	time_t timestamp;
 	struct _req_queue thread_queue;	
 
 	t_sockfd = server_info.sockfd;
+	timestamp = time(NULL);
 	while(1){
 		memset(&thread_queue, 0, sizeof(struct _req_queue));
 		request_dequeue(&thread_queue);
@@ -285,6 +282,14 @@ void *thread_responder(void *vargp){
 				send_data(thread_queue.queue[i], t_sockfd);
 			}
 		}
+	}
+}
+
+void *thread_softstate(void *vargp){
+
+	while(1){
+		sleep(SS_TIMEOUT);
+		client_softstate(&client_manager, &channel_manager);
 	}
 }
 
@@ -298,6 +303,10 @@ rid_t handle_request(char *data){
 	/*Check if request came from authenticated client*/
 	memcpy(&type, data, sizeof(rid_t));
 	client = client_search(&client_info.clientaddr, &client_manager);
+	if(client){
+		/*update client timestamp*/
+		client_keepalive(client);
+	}
 	if(client == NULL && type != REQ_LOGIN){
 		send_error("You are not logged in yet.", &client_info.clientaddr, server_info.sockfd);
 		return REQ_INVALID;
@@ -467,7 +476,11 @@ rid_t handle_request(char *data){
 			pthread_mutex_unlock(&lock1);
 			return REQ_WHO;
 		case REQ_ALIVE:
-			break;
+			/*client timestamp is updated at begining of function*/
+			//client_keepalive(client);
+			snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request KeepAlive %s", client_info.ipaddr_str, client_info.portno_str, client->username);
+			log_recv();
+			return REQ_ALIVE;
 		default:
 			break;		
 	}
@@ -510,8 +523,8 @@ void recvdata_IPv4(){
 
 	clientlen = sizeof(client_info.clientaddr);
 	inet_ntop(AF_INET, &(server_info.serveraddr->sin_addr), server_info.ipaddr_str, INET_ADDRSTRLEN);
-	printf("[+] Server Info:\n\tIPv4 Addr: %s\n\tPort: %d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr->sin_port));
-	printf("Server is now waiting for data...\n");
+	printf("Server Setup Complete.\n");
+	printf("Accepting data on bound socket \t%s:%d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr->sin_port));
 	while(1){
 		memset(input, 0, BUFSIZE+STR_PADD);
 		memset(&client_info, 0, sizeof(struct _client_info));

@@ -2,6 +2,7 @@
 #include "raw.h"
 
 #define STDIN 0
+#define CSS_TIMEOUT 15
 
 struct _server_info{
 	int portno;
@@ -22,6 +23,7 @@ struct _client_info{
 	struct _channel_sub *list_tail;
 	struct _channel_sub *active_channel;
 	int num_channels;
+	time_t timestamp;
 };
 
 struct _channel_sub *channel_search(char *name, struct _client_info *cl);

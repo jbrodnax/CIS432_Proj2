@@ -50,6 +50,9 @@ struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _clien
 	if(!clientaddr || !clm)
 		return NULL;
 
+	if(clm->num_clients < 1)
+		return NULL;
+
 	pthread_rwlock_rdlock(&client_lock);
 	client = clm->list_head;
 	while(client){
@@ -146,6 +149,52 @@ struct client_entry *client_list_tail(struct _client_manager *clm){
 	return client;
 }
 
+int client_softstate(struct _client_manager *clm, struct _channel_manager *chm){
+	struct client_entry *client;	
+	time_t current_time;
+
+	if(!clm || !chm){
+		error_msg("client_softstate received null argument.");
+		return -1;
+	}
+
+	pthread_rwlock_rdlock(&client_lock);
+	current_time = time(NULL);
+	client = clm->list_head;
+	while(client){
+		if((current_time - client->timestamp) >= SS_TIMEOUT){
+			pthread_rwlock_unlock(&client_lock);
+			printf("timeout from client %s\n", client->username);
+			client_logout(client, clm, chm);
+			pthread_rwlock_rdlock(&client_lock);
+		}
+		client = client->next;
+	}
+
+	pthread_rwlock_unlock(&client_lock);
+	return 0;
+}
+
+time_t client_keepalive(struct client_entry *client){
+	time_t current_time;
+
+	if(!client){
+		error_msg("client_keepalive received null client argument.");
+		return 0;
+	}
+
+	pthread_rwlock_wrlock(&client_lock);
+	current_time = time(NULL);
+	if(current_time < 1 || current_time < client->timestamp){
+		error_msg("[!] System error: time() returned inaccurate time.");
+		exit(EXIT_FAILURE);
+	}
+	client->timestamp = current_time;
+
+	pthread_rwlock_unlock(&client_lock);
+	return current_time;
+}
+
 struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, struct _client_manager *clm){
 /*
 * Allocate new client_entry, fill with client info and add it to the tail of the client list.
@@ -169,10 +218,6 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 		clm->list_head = new_client;
 		clm->list_tail = new_client;
 	}else{
-		/*if(client_test_search(name, clm)){
-			printf("[-] Client (%s) already exists.\n", name);
-			return NULL;
-		}*/
 		new_client = malloc(sizeof(struct client_entry));
 		if(!new_client){
 			error_msg(NULL);
@@ -187,7 +232,7 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 	}
 	memcpy(new_client->username, name, NAME_LEN);
 	memcpy(&new_client->clientaddr, clientaddr, sizeof(struct sockaddr_in));
-
+	new_client->timestamp = time(NULL);
 	/*Update list tail and number of clients*/
 	clm->list_tail = new_client;
 	clm->num_clients++;
@@ -223,7 +268,13 @@ int client_remove(struct client_entry *client, struct _client_manager *clm){
 	}
 	if(clm->num_clients > 0)
 		clm->num_clients--;
-	
+	/*Clean up list head/tail if they should be*/
+	if(clm->num_clients < 1){
+		if(clm->list_head || clm->list_tail){
+			clm->list_head = NULL;
+			clm->list_tail = NULL;
+		}
+	}
 	//puts("[+] Unlinked client:");
 	//client_print(client);
 

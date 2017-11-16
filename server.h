@@ -6,6 +6,7 @@ struct client_entry{
 	struct hostent *hostp;
 	struct channel_entry *channel_list[MAX_CHANNELCLIENTS];
 	int num_channels;
+	time_t timestamp;
 	struct client_entry *next;
 	struct client_entry *prev;
 };
@@ -38,6 +39,8 @@ struct client_entry *client_init_list();
 int client_add_channel(struct channel_entry *channel, struct client_entry *client);
 int client_remove_channel(struct channel_entry *channel, struct client_entry *client);
 struct client_entry *client_list_tail(struct _client_manager *clm);
+time_t client_keepalive(struct client_entry *client);
+int client_softstate(struct _client_manager *clm, struct _channel_manager *chm);
 struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, struct _client_manager *clm);
 int client_logout(struct client_entry *client, struct _client_manager *clm, struct _channel_manager *chm);
 int client_remove(struct client_entry *client, struct _client_manager *clm);
@@ -55,5 +58,6 @@ int channel_who(struct _rsp_who *rsp_who, struct channel_entry *ch);
 /*server.c function prototypes*/
 int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd);
 void *thread_responder(void *vargp);
+void *thread_softstate(void *vargp);
 void recvdata_IPv4();
 void recvdata_IPv6();
