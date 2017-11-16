@@ -3,10 +3,12 @@
 #define TREE_MAX 16
 
 struct _adjacent_server{
-	struct sockaddr_in serveraddr;
+	struct sockaddr_in *serveraddr;
+	struct addrinfo *servinfo;
 	char ipaddr[64];
 	char port_str[32];
 	int sockfd;
+	int index;
 };
 
 struct _server_manager{
@@ -47,6 +49,7 @@ struct _channel_manager{
 };
 
 /*client_manager.c function prototypes*/
+void error_msg(char *err_msg);
 void init_rwlocks();
 void client_print(struct client_entry *client);
 struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _client_manager *clm);
@@ -69,6 +72,11 @@ int channel_add_client(struct client_entry *client, struct channel_entry *channe
 int channel_remove_client(struct client_entry *client, struct channel_entry *channel);
 int channel_list(struct _rsp_list *rsp_list, struct _channel_manager *chm);
 int channel_who(struct _rsp_who *rsp_who, struct channel_entry *ch);
+
+/*servertree.c function prototypes*/
+struct _adjacent_server *node_create(char *hostname, char *port, struct _server_manager *svm);
+int node_add(struct _adjacent_server *node, struct _server_manager *svm);
+int node_remove(struct _adjacent_server *node, struct _server_manager *svm);
 
 /*server.c function prototypes*/
 int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd);

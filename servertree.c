@@ -1,25 +1,11 @@
 #include "server.h"
 
-void error_msg(char *err_msg){
-	if(!err_msg){
-		perror("[-] ERROR:\t ");
-		return;
-	}
-
-	printf("[-] ERROR:\t %s\n", err_msg);
-	return;
-}
-
-void node_init_socket(){
-
-}
-
-struct _adjacent_server *node_create(char *hostname, int port, struct _server_manager *svm){
+struct _adjacent_server *node_create(char *hostname, char *port, struct _server_manager *svm){
 	struct _adjacent_server *new_node;
-	struct addrinfo hints, *servinfo, *p;
+	struct addrinfo hints, *p;
 	int rv, optval;
 
-	if(!hostname || !svm || port < 1){
+	if(!hostname || !port || !svm){
 		error_msg("node_create received invalid argument.");
 		return NULL;
 	}
@@ -34,24 +20,87 @@ struct _adjacent_server *node_create(char *hostname, int port, struct _server_ma
 	}
 	memset(new_node, 0, sizeof(struct _adjacent_server));
 	memset(&hints, 0, sizeof(hints));
+	strncpy(new_node->ipaddr, hostname, 64);
+	strncpy(new_node->port_str, port, 32);
+
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = AI_PASSIVE;
-	if((rv = getaddrinfo(server_info.hostname, server_info.portno_str, &hints, &servinfo)) != 0){
+	if((rv = getaddrinfo(new_node->ipaddr, new_node->port_str, &hints, &new_node->servinfo)) != 0){
 		fprintf(stderr, "in getaddrinfo: %s\n", gai_strerror(rv));
 		exit(1);
 	}
 
 	optval = 1;
-	for(p = servinfo; p!=NULL; p = p->ai_next){
+	for(p = new_node->servinfo; p!=NULL; p = p->ai_next){
 		if((new_node->sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1){
 			perror("[?] Error in socket");
 			continue;
 		}
 		setsockopt(new_node->sockfd, SOL_SOCKET, SO_REUSEADDR, (const void*)&optval, sizeof(int));
+		if(bind(new_node->sockfd, p->ai_addr, p->ai_addrlen) == -1){
+			close(new_node->sockfd);
+			perror("Error in bind");
+			continue;
+		}
 		break;
 	}
-	
+	if(p == NULL){
+		fprintf(stderr, "[!] Failed to bind socket\n");
+		exit(EXIT_FAILURE);
+	}
+	new_node->serveraddr = (struct sockaddr_in*)p->ai_addr;
 
 	return new_node;
 }
+
+int node_add(struct _adjacent_server *node, struct _server_manager *svm){
+	/*adds an already initialized node to the server tree and inits the node's index*/
+	if(!node || !svm){
+		error_msg("node_add received null argument.");
+		return -1;
+	}
+	if(svm->tree_size >= TREE_MAX){
+		error_msg("server tree is full.");
+		return -1;
+	}
+
+	svm->tree[svm->tree_size] = node;
+	node->index = svm->tree_size;
+	svm->tree_size++;
+
+	return svm->tree_size;
+}
+
+int node_remove(struct _adjacent_server *node, struct _server_manager *svm){
+	/*The svm tree array is not rearranged when a node is removed
+	since node's keep track of their init index in the array*/
+	if(!node || !svm){
+		error_msg("node_remove received null argument.");
+		return -1;
+	}
+	if(svm->tree_size < 1 || node->index > svm->tree_size){
+		error_msg("node_remove received invalid node index.");
+		return -1;
+	}
+
+	close(node->sockfd);
+	freeaddrinfo(node->servinfo);
+	free(node);
+	svm->tree[node->index] = NULL;
+	svm->tree_size--;
+
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+

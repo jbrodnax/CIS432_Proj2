@@ -47,6 +47,7 @@ struct _client_manager client_manager;
 struct _channel_manager channel_manager;
 struct _server_info server_info;
 struct _client_info client_info;
+struct _server_manager server_manager;
 struct addrinfo hints, *servinfo, *p;
 
 pthread_t tid[2];
@@ -66,6 +67,7 @@ void sig_handler(int signo){
 	if(signo == SIGINT){
 		printf("SIGINT Caught.\n");
 		//FIX: implement clean up
+		freeaddrinfo(servinfo);
 		exit(EXIT_SUCCESS);
 	}
 }
@@ -89,6 +91,29 @@ void test_chm(){
 		exit(EXIT_FAILURE);
 	}
 	return;
+}
+
+void init_servertree(int argc, char *argv[]){
+	char *hostname;
+	char *port;
+	struct _adjacent_server *node;
+	int n;
+
+	memset(&server_manager, 0, sizeof(struct _server_manager));
+	for(n=3; n < argc; n+=2){
+		if(strlen(argv[n]) > 0 && strlen(argv[n+1]) > 0){
+			hostname = argv[n];
+			port = argv[n+1];
+			node = node_create(hostname, port, &server_manager);
+			if(node){
+				printf("Adjacent server node on bound socket \t%s:%d\n", node->ipaddr, ntohs(node->serveraddr->sin_port));
+				node_add(node, &server_manager);
+			}else{
+				fprintf(stderr, "[!] Failed to create node for '%s:%s'\n", hostname, port);
+				exit(EXIT_FAILURE);
+			}
+		}
+	}
 }
 
 void init_server(){
@@ -130,12 +155,13 @@ void init_server(){
 		fprintf(stderr, "[!] Failed to bind socket\n");
 		exit(1);
 	}
-	/*Create Common channel*/
+	server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;
+	/*Create Common channel
 	test_chm();
 	switch (p->ai_family){
 		case AF_INET:
 			server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;
-			/*Create response thread*/
+			//Create response thread
 			pthread_create(&tid[0], NULL, thread_responder, NULL);
 			pthread_create(&tid[1], NULL, thread_softstate, NULL);
 			recvdata_IPv4();
@@ -149,7 +175,7 @@ void init_server(){
 			fprintf(stderr, "Error: ai_family invalid.\n");
 			exit(1);
 	}
-	freeaddrinfo(servinfo);
+	*/
 
 	return;
 }
@@ -549,7 +575,7 @@ int main(int argc, char *argv[]){
 	int n;
 	void *ptr;
 
-	if(argc != 3){
+	if((argc%2) != 1){
 		printf("Usage: \n");
 		exit(0);
 	}
@@ -574,6 +600,27 @@ int main(int argc, char *argv[]){
 		exit(EXIT_FAILURE);
 	}
 	init_server();
+	init_servertree(argc, argv);
+	/*
+	test_chm();
+	switch (p->ai_family){
+		case AF_INET:
+			server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;
+			//Create response thread
+			pthread_create(&tid[0], NULL, thread_responder, NULL);
+			pthread_create(&tid[1], NULL, thread_softstate, NULL);
+			recvdata_IPv4();
+			break;
+		case AF_INET6:
+			puts("ai_family IPv6");
+			server_info.serveraddr6 = (struct sockaddr_in6*)p->ai_addr;	
+			recvdata_IPv6();
+			break;
+		default:
+			fprintf(stderr, "Error: ai_family invalid.\n");
+			exit(1);
+	}
+	*/
 
 	return 0;
 }
