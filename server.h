@@ -1,5 +1,20 @@
 #include "duckchat.h"
 
+#define TREE_MAX 16
+
+struct _adjacent_server{
+	struct sockaddr_in serveraddr;
+	char ipaddr[64];
+	char port_str[32];
+	int sockfd;
+};
+
+struct _server_manager{
+	struct _adjacent_server *tree[TREE_MAX];
+	struct _adjacent_server *last_accessed;
+	int tree_size;
+};
+
 struct client_entry{
 	char username[NAME_LEN+STR_PADD];
 	struct sockaddr_in clientaddr;
