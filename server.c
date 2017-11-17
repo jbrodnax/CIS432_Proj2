@@ -90,7 +90,7 @@ void log_send(){
 
 void test_chm(){
 	init_rwlocks();
-	if(!channel_create(init_channelname, &channel_manager)){
+	if(!channel_create(init_channelname, &channel_manager, &server_manager)){
 		fprintf(stderr, "[!] Error: Channel creation of (%s) failed.");
 		exit(EXIT_FAILURE);
 	}
@@ -325,6 +325,7 @@ void *thread_softstate(void *vargp){
 
 rid_t handle_request(char *data){
 	struct client_entry *client;
+	struct _adjacent_server *node;
 	struct channel_entry *channel;
 	struct _queue_entry *entry;
 	rid_t type;
@@ -332,6 +333,39 @@ rid_t handle_request(char *data){
 
 	/*Check if request came from authenticated client*/
 	memcpy(&type, data, sizeof(rid_t));
+	node = node_search(&client_info.clientaddr, &server_manager);
+	if(node){	
+		switch(type){
+			case S2S_JOIN:
+				if(!(s2s_join = malloc(sizeof(struct _S2S_join)))){
+					perror("Error in malloc");
+					exit(EXIT_FAILURE);
+				}
+				memset(s2s_join, 0, sizeof(struct _S2S_join));
+				memcpy(s2s_join, data, sizeof(struct _S2S_join)-1);
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Join %s", node->ipaddr, node->port_str, s2s_join->channel);
+				log_recv();
+				free(s2s_join);
+				return S2S_JOIN;
+			case S2S_LEAVE:
+				if(!(s2s_leave = malloc(sizeof(struct _S2S_leave)))){
+					perror("Error in malloc");
+					exit(EXIT_FAILURE);
+				}
+				memset(s2s_leave, 0, sizeof(struct _S2S_leave));
+				memcpy(s2s_leave, data, sizeof(struct _S2S_leave)-1);
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Leave %s", node->ipaddr, node->port_str, s2s_leave->channel);
+				log_recv();
+				free(s2s_leave);
+				return S2S_LEAVE;
+			case S2S_SAY:
+				puts("Testing: received S2S say request.");
+				return S2S_SAY;
+			default:
+				return REQ_INVALID;
+		}
+	}
+
 	client = client_search(&client_info.clientaddr, &client_manager);
 	if(client){
 		/*update client timestamp*/
@@ -382,7 +416,7 @@ rid_t handle_request(char *data){
 			
 			channel = channel_search(req_join->channel, &channel_manager);
 			if(!channel){
-				channel = channel_create(req_join->channel, &channel_manager);
+				channel = channel_create(req_join->channel, &channel_manager, &server_manager);
 				if(!channel){
 					send_error("join request failed.", &client_info.clientaddr, server_info.sockfd);
 					free(req_join);
@@ -402,7 +436,13 @@ rid_t handle_request(char *data){
 				free(req_join);
 				break;
 			}
-
+			if(!(s2s_join = malloc(sizeof(struct _S2S_join)))){
+				perror("Error in malloc");
+				exit(EXIT_FAILURE);
+			}
+			memcpy(s2s_join, req_join, sizeof(struct _req_join));
+			propogate_join(channel, s2s_join);
+			free(s2s_join);
 			free(req_join);
 			return REQ_JOIN;
 		case REQ_LEAVE:
@@ -564,6 +604,7 @@ void recvdata_IPv4(){
 			perror("[?] Issue in revcfrom");
 			continue;
 		}
+		puts("Received data");
 
 		getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), 
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
@@ -605,31 +646,23 @@ int main(int argc, char *argv[]){
 	}
 	init_server();
 	init_servertree(argc, argv);
-	s2s_say = malloc(sizeof(struct _S2S_say));
-	for(n=0; n<4; n++){
-		memset(s2s_say, 0, sizeof(struct _S2S_say));
-		generate_id(s2s_say);
-	}
-	/*
+	
 	test_chm();
 	switch (p->ai_family){
 		case AF_INET:
-			server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;
 			//Create response thread
 			pthread_create(&tid[0], NULL, thread_responder, NULL);
 			pthread_create(&tid[1], NULL, thread_softstate, NULL);
 			recvdata_IPv4();
 			break;
 		case AF_INET6:
-			puts("ai_family IPv6");
-			server_info.serveraddr6 = (struct sockaddr_in6*)p->ai_addr;	
+			puts("ai_family IPv6");	
 			recvdata_IPv6();
 			break;
 		default:
 			fprintf(stderr, "Error: ai_family invalid.\n");
 			exit(1);
 	}
-	*/
 
 	return 0;
 }

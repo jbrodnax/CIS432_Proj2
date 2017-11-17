@@ -56,6 +56,8 @@ struct _client_manager{
 struct channel_entry{
 	char channel_name[NAME_LEN+STR_PADD];
 	struct client_entry *client_list[MAX_CHANNELCLIENTS];
+	struct _adjacent_server *routing_table[TREE_MAX];
+	int table_size;
 	int num_clients;
 	struct channel_entry *next;
 	struct channel_entry *prev;
@@ -84,7 +86,7 @@ int client_remove(struct client_entry *client, struct _client_manager *clm);
 void client_clean(struct _client_manager *clm);
 struct channel_entry *channel_search(char *name, struct _channel_manager *chm);
 struct channel_entry *channel_list_tail(struct _channel_manager *chm);
-struct channel_entry *channel_create(char *name, struct _channel_manager *chm);
+struct channel_entry *channel_create(char *name, struct _channel_manager *chm, struct _server_manager *svm);
 int channel_remove(struct channel_entry *channel, struct _channel_manager *chm);
 void channel_clean(struct _channel_manager *chm);
 int channel_add_client(struct client_entry *client, struct channel_entry *channel);
@@ -98,6 +100,10 @@ int node_add(struct _adjacent_server *node, struct _server_manager *svm);
 int node_remove(struct _adjacent_server *node, struct _server_manager *svm);
 struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _server_manager *svm);
 unique_t generate_id(struct _S2S_say *req);
+int rtable_init(struct channel_entry *ch, struct _server_manager *svm);
+int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm);
+int propogate_join(struct channel_entry *ch, struct _S2S_join *req);
+int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req);
 
 /*server.c function prototypes*/
 int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd);

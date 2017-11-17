@@ -140,6 +140,114 @@ unique_t generate_id(struct _S2S_say *req){
 	return id;
 }
 
+int rtable_init(struct channel_entry *ch, struct _server_manager *svm){
+	int n, i;
+
+	if(!ch || !svm){
+		error_msg("rtable_init received null arguments.");
+		return -1;
+	}
+
+	n = 0;
+	i = 0;
+	memset(ch->routing_table, 0, TREE_MAX);
+	while(n < svm->tree_size && i < TREE_MAX){
+		if(svm->tree[i] != NULL){
+			ch->routing_table[n] = svm->tree[i];
+			n++;
+		}
+		i++;
+	}
+	ch->table_size = n;
+
+	return 0;
+}
+
+int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm){
+	struct _adjacent_server *node2;
+	int n, opt, i;
+
+	if(!ch || !node || !svm){
+		error_msg("rtable_prune received null argument.");
+		return -1;
+	}
+
+	n = 0;
+	opt = 0;
+	while(n < TREE_MAX){
+		node2 = ch->routing_table[n];
+		if(node2 == NULL){
+			n++;
+			continue;
+		}
+		if(node2->serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
+			if(node2->serveraddr->sin_port == node->serveraddr->sin_port){
+				opt = 1;
+				break;
+			}
+		}
+		n++;
+	}
+	if(opt == 0)
+		return -1;
+
+	for(i=n; i < TREE_MAX-1; i++)
+		ch->routing_table[i] = ch->routing_table[i+1];
+	/*Since at least one entry should be open now, zero-out the */
+	ch->routing_table[i] = NULL;
+	if(ch->table_size > 0)
+		ch->table_size--;
+
+	return 0;
+}
+
+int propogate_join(struct channel_entry *ch, struct _S2S_join *req){
+	struct _adjacent_server *node;
+	int n, i;
+
+	if(!ch || !req){
+		error_msg("propogate_join received null argument.");
+		return -1;
+	}
+
+	for(n=0; n < ch->table_size; n++){
+		node = ch->routing_table[n];
+		if(!node)
+			continue;
+		i = sendto(node->sockfd, req, sizeof(struct _S2S_join), 0, (struct sockaddr *)&node->serveraddr, sizeof(struct sockaddr));
+		if(i < 0)
+			perror("Error in sendto JOIN");
+	}
+	
+	return n;
+}
+
+int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req){
+	struct _adjacent_server *node;
+	int n, i;
+
+	if(!ch || !req){
+		error_msg("propogate_leave received null argument.");
+		return -1;
+	}
+
+	for(n=0; n < ch->table_size; n++){
+		node = ch->routing_table[n];
+		if(!node)
+			continue;
+		i = sendto(node->sockfd, req, sizeof(struct _S2S_leave), 0, (struct sockaddr *)&node->serveraddr, sizeof(struct sockaddr));
+		if(i < 0)
+			perror("Error in sendto");
+	}
+	
+	return n;
+}
+
+
+
+
+
+
 
 
 

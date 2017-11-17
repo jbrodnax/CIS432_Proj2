@@ -378,14 +378,14 @@ struct channel_entry *channel_list_tail(struct _channel_manager *chm){
 	return channel;
 }
 
-struct channel_entry *channel_create(char *name, struct _channel_manager *chm){
+struct channel_entry *channel_create(char *name, struct _channel_manager *chm, struct _server_manager *svm){
 /*
 * Allocate new client_entry, fill with client info and add it to the tail of the client list.
 * Inits client_list if NULL;
 */
 	struct channel_entry *new_channel;
 
-	if(!name || !chm){
+	if(!name || !chm || !svm){
 		error_msg(channel_err1);
 		return NULL;
 	}
@@ -423,6 +423,7 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm){
 	chm->list_tail = new_channel;
 	chm->num_channels++;
 	new_channel->num_clients = 0;
+	rtable_init(new_channel, svm);
 
 	//printf("[+] New channel (%s) created.\n", new_channel->channel_name);
 
