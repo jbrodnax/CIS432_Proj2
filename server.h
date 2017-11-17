@@ -1,6 +1,7 @@
 #include "duckchat.h"
 
 #define TREE_MAX 16
+#define UID_MAX 128
 typedef uint64_t unique_t;
 
 struct __attribute__((packed)) _S2S_join{
@@ -33,6 +34,8 @@ struct _adjacent_server{
 struct _server_manager{
 	struct _adjacent_server *tree[TREE_MAX];
 	struct _adjacent_server *last_accessed;
+	unique_t recent_ids[UID_MAX];
+	int num_ids;
 	int tree_size;
 };
 
@@ -106,6 +109,9 @@ unique_t generate_id(struct _S2S_say *req);
 int rtable_init(struct channel_entry *ch, struct _server_manager *svm);
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm);
 int propogate_join(struct channel_entry *ch, struct _S2S_join *req, int sockfd);
+int save_id(unique_t id, struct _server_manager *svm);
+struct _S2S_say *create_S2S_say(char *username, char *channel, char *text, struct _server_manager *svm);
+int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd);
 int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req, int sockfd);
 
 /*server.c function prototypes*/

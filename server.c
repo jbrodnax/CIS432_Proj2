@@ -160,26 +160,6 @@ void init_server(){
 		exit(1);
 	}
 	server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;
-	/*Create Common channel
-	test_chm();
-	switch (p->ai_family){
-		case AF_INET:
-			server_info.serveraddr = (struct sockaddr_in*)p->ai_addr;
-			//Create response thread
-			pthread_create(&tid[0], NULL, thread_responder, NULL);
-			pthread_create(&tid[1], NULL, thread_softstate, NULL);
-			recvdata_IPv4();
-			break;
-		case AF_INET6:
-			puts("ai_family IPv6");
-			server_info.serveraddr6 = (struct sockaddr_in6*)p->ai_addr;	
-			recvdata_IPv6();
-			break;
-		default:
-			fprintf(stderr, "Error: ai_family invalid.\n");
-			exit(1);
-	}
-	*/
 
 	return;
 }
@@ -342,9 +322,19 @@ rid_t handle_request(char *data){
 					exit(EXIT_FAILURE);
 				}
 				memset(s2s_join, 0, sizeof(struct _S2S_join));
-				memcpy(s2s_join, data, sizeof(struct _S2S_join)-1);
+				s2s_join->type_id = S2S_JOIN;
+				memcpy(s2s_join->channel, &data[sizeof(rid_t)], NAME_LEN-1);
 				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Join %s", node->ipaddr, node->port_str, s2s_join->channel);
 				log_recv();
+				channel = channel_search(s2s_join->channel, &channel_manager);
+				if(!channel){
+					channel = channel_create(s2s_join->channel, &channel_manager, &server_manager);
+					if(!channel){
+						free(s2s_join);
+						return REQ_INVALID;
+					}
+					propogate_join(channel, s2s_join, server_info.sockfd);
+				}
 				free(s2s_join);
 				return S2S_JOIN;
 			case S2S_LEAVE:
@@ -353,9 +343,17 @@ rid_t handle_request(char *data){
 					exit(EXIT_FAILURE);
 				}
 				memset(s2s_leave, 0, sizeof(struct _S2S_leave));
-				memcpy(s2s_leave, data, sizeof(struct _S2S_leave)-1);
+				s2s_leave->type_id = S2S_LEAVE;
+				memcpy(s2s_leave->channel, &data[sizeof(rid_t)], NAME_LEN-1);
 				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Leave %s", node->ipaddr, node->port_str, s2s_leave->channel);
 				log_recv();
+				channel = channel_search(s2s_leave->channel, &channel_manager);
+				if(channel){
+					if(rtable_prune(channel, node, &server_manager) < 0){
+						printf("%s:%s\terror: Failed to prune %s's routing table\n", server_info.ipaddr_str, server_info.portno_str, channel->channel_name);
+						return REQ_INVALID;
+					}
+				}
 				free(s2s_leave);
 				return S2S_LEAVE;
 			case S2S_SAY:
@@ -424,6 +422,13 @@ rid_t handle_request(char *data){
 					free(req_join);
 					break;
 				}
+				if(!(s2s_join = malloc(sizeof(struct _S2S_join)))){
+					perror("Error in malloc");
+					exit(EXIT_FAILURE);
+				}
+				s2s_join->type_id = S2S_JOIN;
+				memcpy(s2s_join->channel, channel->channel_name, NAME_LEN);
+				propogate_join(channel, s2s_join, server_info.sockfd);
 			}
 			n = client_add_channel(channel, client);
 			/*Only send error message if client_add_channel return with an error e.g. -1*/
@@ -438,13 +443,7 @@ rid_t handle_request(char *data){
 				free(req_join);
 				break;
 			}
-			if(!(s2s_join = malloc(sizeof(struct _S2S_join)))){
-				perror("Error in malloc");
-				exit(EXIT_FAILURE);
-			}
-			s2s_join->type_id = S2S_JOIN;
-			memcpy(s2s_join->channel, channel->channel_name, NAME_LEN);
-			propogate_join(channel, s2s_join, server_info.sockfd);
+
 			free(s2s_join);
 			free(req_join);
 			return REQ_JOIN;
@@ -491,6 +490,14 @@ rid_t handle_request(char *data){
 			log_recv();
 			//printf("[>] Say request from (%s) for channel: (%s)\n\tMessage: %s\n", client->username, req_say->channel, req_say->text);
 			/*Enqueue request for sender thread*/
+			channel = channel_search(req_say->channel, &channel_manager);
+			if(channel){
+				s2s_say = create_S2S_say(client->username, req_say->channel, req_say->text, &server_manager);
+				if(s2s_say){
+					propogate_say(channel, s2s_say, server_info.sockfd);
+				}
+				free(s2s_say);
+			}
 			pthread_mutex_lock(&lock1);
 			if(main_queue.size < MAXQSIZE){
 				//FIX: add check

@@ -238,6 +238,77 @@ int propogate_join(struct channel_entry *ch, struct _S2S_join *req, int sockfd){
 	
 	return n;
 }
+/*This storage method for ids is terrible*/
+int save_id(unique_t id, struct _server_manager *svm){
+	int n, retval;
+
+	for(n=0; n < svm->num_ids; n++){
+		if(n >= UID_MAX-1){
+			//memcpy(svm->recent_ids, &svm->recent_ids[(UID_MAX/2)], (UID_MAX*sizeof(unique_t)));
+			//memset(&svm->recent_ids[(UID_MAX/2)], 0, (UID_MAX*sizeof(unique_t)));
+			memset(svm->recent_ids, 0, sizeof(unique_t)*UID_MAX);
+			if(retval == 0){
+				svm->recent_ids[0] = id;
+				svm->num_ids = 1;
+				return retval;
+			}
+		}
+		if(svm->recent_ids[n] == id)
+			retval = 1;
+	}
+	if(retval == 0){
+		svm->recent_ids[n] = id;
+		svm->num_ids++;
+	}
+	return retval;
+}
+
+struct _S2S_say *create_S2S_say(char *username, char *channel, char *text, struct _server_manager *svm){
+	struct _S2S_say *rsp;
+
+	if(!username || !channel || !text){
+		error_msg("create_s2s_say received null argument.");
+		return NULL;
+	}
+	if(!(rsp = malloc(sizeof(struct _S2S_say)))){
+		perror("Error in malloc");
+		exit(EXIT_FAILURE);
+	}
+	memset(rsp, 0, sizeof(struct _S2S_say));
+	rsp->type_id = S2S_SAY;
+	memcpy(rsp->username, username, NAME_LEN);
+	memcpy(rsp->channel, channel, NAME_LEN);
+	memcpy(rsp->text, text, TEXT_LEN);
+	generate_id(rsp);
+	if(save_id(rsp->msg_id, svm) > 0){
+		error_msg("generated say request with non-unique id.");
+	}
+
+	return rsp;
+}
+
+int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd){
+	struct _adjacent_server *node;
+	int n, i;
+
+	if(!ch || !req){
+		error_msg("prop_say received null argument.");
+		return -1;
+	}
+
+	for(n=0; n < ch->table_size; n++){
+		node = ch->routing_table[n];
+		if(!node)
+			continue;	
+		snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s", node->ipaddr, node->port_str, req->username, req->channel, req->text);
+		log_send();
+		i = sendto(sockfd, req, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
+		if(i < 0)
+			perror("Error in sendto");
+	}
+
+	return n;
+}
 
 int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req, int sockfd){
 	struct _adjacent_server *node;
