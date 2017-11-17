@@ -24,6 +24,7 @@ struct __attribute__((packed)) _S2S_say{
 struct _adjacent_server{
 	struct sockaddr_in *serveraddr;
 	struct addrinfo hints, *servinfo;
+	char hostname[256];
 	char ipaddr[64];
 	char port_str[32];
 	int index;
@@ -68,6 +69,9 @@ struct _channel_manager{
 	int num_channels;
 };
 
+char *LOG_RECV;
+char *LOG_SEND;
+
 /*client_manager.c function prototypes*/
 void error_msg(char *err_msg);
 void init_rwlocks();
@@ -106,6 +110,8 @@ int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req, int sockfd
 
 /*server.c function prototypes*/
 int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd);
+void log_recv();
+void log_send();
 void *thread_responder(void *vargp);
 void *thread_softstate(void *vargp);
 void recvdata_IPv4();

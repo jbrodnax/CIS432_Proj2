@@ -58,8 +58,8 @@ pthread_t tid[2];
 pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 char init_channelname[]="Common";
 char ERR_MSG[TEXT_LEN];
-char *LOG_RECV;
-char *LOG_SEND;
+//char *LOG_RECV;
+//char *LOG_SEND;
 time_t timestamp;
 
 void error(char *msg){
@@ -331,11 +331,10 @@ rid_t handle_request(char *data){
 	rid_t type;
 	int n;
 
-	/*Check if request came from authenticated client*/
+	/*Check if request came from adjacent server*/
 	memcpy(&type, data, sizeof(rid_t));
 	node = node_search(&client_info.clientaddr, &server_manager);
-	if(node){
-		printf("S2S request contains: %hu %s\n", data, &data[sizeof(rid_t)]);
+	if(node){	
 		switch(type){
 			case S2S_JOIN:
 				if(!(s2s_join = malloc(sizeof(struct _S2S_join)))){
@@ -344,7 +343,7 @@ rid_t handle_request(char *data){
 				}
 				memset(s2s_join, 0, sizeof(struct _S2S_join));
 				memcpy(s2s_join, data, sizeof(struct _S2S_join)-1);
-				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Join %s", node->ipaddr, node->port_str, s2s_join->channel);
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Join %s", node->ipaddr, node->port_str, s2s_join->channel);
 				log_recv();
 				free(s2s_join);
 				return S2S_JOIN;
@@ -355,15 +354,15 @@ rid_t handle_request(char *data){
 				}
 				memset(s2s_leave, 0, sizeof(struct _S2S_leave));
 				memcpy(s2s_leave, data, sizeof(struct _S2S_leave)-1);
-				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Leave %s", node->ipaddr, node->port_str, s2s_leave->channel);
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Leave %s", node->ipaddr, node->port_str, s2s_leave->channel);
 				log_recv();
 				free(s2s_leave);
 				return S2S_LEAVE;
 			case S2S_SAY:
-				puts("Testing: received S2S say request.");
+				
 				return S2S_SAY;
 			default:
-				snprintf(LOG_RECV, LOGMSG_LEN, "Invalid S2S request");
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Invalid", node->ipaddr, node->port_str);
         			log_recv();
 				return REQ_INVALID;
 		}
@@ -443,7 +442,8 @@ rid_t handle_request(char *data){
 				perror("Error in malloc");
 				exit(EXIT_FAILURE);
 			}
-			memcpy(s2s_join, req_join, sizeof(struct _req_join));
+			s2s_join->type_id = S2S_JOIN;
+			memcpy(s2s_join->channel, channel->channel_name, NAME_LEN);
 			propogate_join(channel, s2s_join, server_info.sockfd);
 			free(s2s_join);
 			free(req_join);
@@ -608,8 +608,6 @@ void recvdata_IPv4(){
 			perror("[?] Issue in revcfrom");
 			continue;
 		}
-		printf("Received data: %08x\t%s\n", input, &input[4]);
-
 		getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), 
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
 		//printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);

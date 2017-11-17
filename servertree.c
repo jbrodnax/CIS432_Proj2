@@ -20,17 +20,19 @@ struct _adjacent_server *node_create(char *hostname, char *port, struct _server_
 	}
 	memset(new_node, 0, sizeof(struct _adjacent_server));
 	memset(&new_node->hints, 0, sizeof(new_node->hints));
-	strncpy(new_node->ipaddr, hostname, 64);
+	strncpy(new_node->hostname, hostname, 256);
 	strncpy(new_node->port_str, port, 32);
 
 	new_node->hints.ai_family = AF_INET;
 	new_node->hints.ai_socktype = SOCK_DGRAM;
 	new_node->hints.ai_flags = AI_PASSIVE;
-	if((rv = getaddrinfo(new_node->ipaddr, new_node->port_str, &new_node->hints, &new_node->servinfo)) != 0){
+	if((rv = getaddrinfo(new_node->hostname, new_node->port_str, &new_node->hints, &new_node->servinfo)) != 0){
 		fprintf(stderr, "in getaddrinfo: %s\n", gai_strerror(rv));
 		exit(1);
 	}
 	new_node->serveraddr = (struct sockaddr_in*)new_node->servinfo->ai_addr;
+	getnameinfo((struct sockaddr*)new_node->serveraddr, sizeof(struct sockaddr),
+		new_node->ipaddr, 64, new_node->port_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
 	//new_node->serveraddr->sin_family = AF_INET;
 	/*
 	optval = 1;
@@ -226,7 +228,9 @@ int propogate_join(struct channel_entry *ch, struct _S2S_join *req, int sockfd){
 		node = ch->routing_table[n];
 		if(!node)
 			continue;
-		printf("propping JOIN to: %s:%s\nsending: %hu %s\n", node->ipaddr, node->port_str, req->type_id, req->channel);
+		//printf("propping JOIN to: %s:%s\nsending: %hu %s\n", node->ipaddr, node->port_str, req->type_id, req->channel);
+		snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Join %s", node->ipaddr, node->port_str, req->channel);
+		log_send();
 		i = sendto(sockfd, req, sizeof(struct _S2S_join), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
 		if(i < 0)
 			perror("Error in sendto JOIN");
