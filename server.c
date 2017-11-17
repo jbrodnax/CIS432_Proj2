@@ -334,7 +334,8 @@ rid_t handle_request(char *data){
 	/*Check if request came from authenticated client*/
 	memcpy(&type, data, sizeof(rid_t));
 	node = node_search(&client_info.clientaddr, &server_manager);
-	if(node){	
+	if(node){
+		printf("S2S request contains: %hu %s\n", data, &data[sizeof(rid_t)]);
 		switch(type){
 			case S2S_JOIN:
 				if(!(s2s_join = malloc(sizeof(struct _S2S_join)))){
@@ -362,6 +363,8 @@ rid_t handle_request(char *data){
 				puts("Testing: received S2S say request.");
 				return S2S_SAY;
 			default:
+				snprintf(LOG_RECV, LOGMSG_LEN, "Invalid S2S request");
+        			log_recv();
 				return REQ_INVALID;
 		}
 	}
@@ -441,7 +444,7 @@ rid_t handle_request(char *data){
 				exit(EXIT_FAILURE);
 			}
 			memcpy(s2s_join, req_join, sizeof(struct _req_join));
-			propogate_join(channel, s2s_join);
+			propogate_join(channel, s2s_join, server_info.sockfd);
 			free(s2s_join);
 			free(req_join);
 			return REQ_JOIN;
@@ -554,7 +557,8 @@ rid_t handle_request(char *data){
 		default:
 			break;		
 	}
-
+	snprintf(LOG_RECV, LOGMSG_LEN, "Invalid request");
+	log_recv();
 	return REQ_INVALID;
 }
 
@@ -604,7 +608,7 @@ void recvdata_IPv4(){
 			perror("[?] Issue in revcfrom");
 			continue;
 		}
-		puts("Received data");
+		printf("Received data: %08x\t%s\n", input, &input[4]);
 
 		getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), 
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);

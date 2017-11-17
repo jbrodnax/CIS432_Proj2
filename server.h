@@ -23,10 +23,9 @@ struct __attribute__((packed)) _S2S_say{
 
 struct _adjacent_server{
 	struct sockaddr_in *serveraddr;
-	struct addrinfo *servinfo;
+	struct addrinfo hints, *servinfo;
 	char ipaddr[64];
 	char port_str[32];
-	int sockfd;
 	int index;
 };
 
@@ -102,8 +101,8 @@ struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _ser
 unique_t generate_id(struct _S2S_say *req);
 int rtable_init(struct channel_entry *ch, struct _server_manager *svm);
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm);
-int propogate_join(struct channel_entry *ch, struct _S2S_join *req);
-int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req);
+int propogate_join(struct channel_entry *ch, struct _S2S_join *req, int sockfd);
+int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req, int sockfd);
 
 /*server.c function prototypes*/
 int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd);

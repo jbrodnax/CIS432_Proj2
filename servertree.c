@@ -2,7 +2,7 @@
 
 struct _adjacent_server *node_create(char *hostname, char *port, struct _server_manager *svm){
 	struct _adjacent_server *new_node;
-	struct addrinfo hints, *p;
+	struct addrinfo *p;
 	int rv, optval;
 
 	if(!hostname || !port || !svm){
@@ -19,18 +19,20 @@ struct _adjacent_server *node_create(char *hostname, char *port, struct _server_
 		exit(EXIT_FAILURE);
 	}
 	memset(new_node, 0, sizeof(struct _adjacent_server));
-	memset(&hints, 0, sizeof(hints));
+	memset(&new_node->hints, 0, sizeof(new_node->hints));
 	strncpy(new_node->ipaddr, hostname, 64);
 	strncpy(new_node->port_str, port, 32);
 
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = AI_PASSIVE;
-	if((rv = getaddrinfo(new_node->ipaddr, new_node->port_str, &hints, &new_node->servinfo)) != 0){
+	new_node->hints.ai_family = AF_INET;
+	new_node->hints.ai_socktype = SOCK_DGRAM;
+	new_node->hints.ai_flags = AI_PASSIVE;
+	if((rv = getaddrinfo(new_node->ipaddr, new_node->port_str, &new_node->hints, &new_node->servinfo)) != 0){
 		fprintf(stderr, "in getaddrinfo: %s\n", gai_strerror(rv));
 		exit(1);
 	}
-
+	new_node->serveraddr = (struct sockaddr_in*)new_node->servinfo->ai_addr;
+	//new_node->serveraddr->sin_family = AF_INET;
+	/*
 	optval = 1;
 	for(p = new_node->servinfo; p!=NULL; p = p->ai_next){
 		if((new_node->sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1){
@@ -49,8 +51,19 @@ struct _adjacent_server *node_create(char *hostname, char *port, struct _server_
 		fprintf(stderr, "[!] Failed to bind socket\n");
 		exit(EXIT_FAILURE);
 	}
-	new_node->serveraddr = (struct sockaddr_in*)p->ai_addr;
-
+	new_node->p = p;
+	new_node->serveraddr = (struct sockaddr_in*)new_node->p->ai_addr;
+	switch(p->ai_family){
+		case AF_INET:
+			puts("Adjacent server socket is IPv4");
+			break;
+		case AF_INET6:
+			puts("Adjacent server socket is IPv6");
+			break;
+		default:
+			puts("Error: invalid ai_family");
+	}
+	*/
 	return new_node;
 }
 
@@ -83,8 +96,7 @@ int node_remove(struct _adjacent_server *node, struct _server_manager *svm){
 		error_msg("node_remove received invalid node index.");
 		return -1;
 	}
-
-	close(node->sockfd);
+	
 	freeaddrinfo(node->servinfo);
 	free(node);
 	svm->tree[node->index] = NULL;
@@ -201,7 +213,7 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 	return 0;
 }
 
-int propogate_join(struct channel_entry *ch, struct _S2S_join *req){
+int propogate_join(struct channel_entry *ch, struct _S2S_join *req, int sockfd){
 	struct _adjacent_server *node;
 	int n, i;
 
@@ -214,7 +226,8 @@ int propogate_join(struct channel_entry *ch, struct _S2S_join *req){
 		node = ch->routing_table[n];
 		if(!node)
 			continue;
-		i = sendto(node->sockfd, req, sizeof(struct _S2S_join), 0, (struct sockaddr *)&node->serveraddr, sizeof(struct sockaddr));
+		printf("propping JOIN to: %s:%s\nsending: %hu %s\n", node->ipaddr, node->port_str, req->type_id, req->channel);
+		i = sendto(sockfd, req, sizeof(struct _S2S_join), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
 		if(i < 0)
 			perror("Error in sendto JOIN");
 	}
@@ -222,7 +235,7 @@ int propogate_join(struct channel_entry *ch, struct _S2S_join *req){
 	return n;
 }
 
-int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req){
+int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req, int sockfd){
 	struct _adjacent_server *node;
 	int n, i;
 
@@ -235,7 +248,7 @@ int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req){
 		node = ch->routing_table[n];
 		if(!node)
 			continue;
-		i = sendto(node->sockfd, req, sizeof(struct _S2S_leave), 0, (struct sockaddr *)&node->serveraddr, sizeof(struct sockaddr));
+		i = sendto(sockfd, req, sizeof(struct _S2S_leave), 0, (struct sockaddr *)&node->serveraddr, sizeof(struct sockaddr));
 		if(i < 0)
 			perror("Error in sendto");
 	}
