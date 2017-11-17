@@ -119,7 +119,21 @@ struct __attribute__((packed)) _rsp_err {
 	char message[TEXT_LEN];
 };
 
+typedef struct __attribute__((packed)) __sreq_name {
+	rid_t type_id;
+	char name[NAME_LEN+STR_PADD];
+} _sreq_name;
 
+typedef struct __attribute__((packed)) __sreq_say {
+	rid_t type_id;
+	char channel[NAME_LEN+STR_PADD];
+	char text[TEXT_LEN+STR_PADD];
+} _sreq_say;
+
+typedef union __sreq_union {
+	_sreq_name sreq_name;
+	_sreq_say sreq_say;
+} _sreq_union;
 
 
 
