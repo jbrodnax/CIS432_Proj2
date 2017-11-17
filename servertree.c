@@ -242,6 +242,7 @@ int propogate_join(struct channel_entry *ch, struct _S2S_join *req, int sockfd){
 int save_id(unique_t id, struct _server_manager *svm){
 	int n, retval;
 
+	retval = 0;
 	for(n=0; n < svm->num_ids; n++){
 		if(n >= UID_MAX-1){
 			//memcpy(svm->recent_ids, &svm->recent_ids[(UID_MAX/2)], (UID_MAX*sizeof(unique_t)));
@@ -310,23 +311,22 @@ int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd){
 	return n;
 }
 
-int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req, int sockfd){
-	struct _adjacent_server *node;
+int send_leave(char *ch, struct _adjacent_server *node, int sockfd){
+	//struct _adjacent_server *node;
+	struct _S2S_leave req;
 	int n, i;
 
-	if(!ch || !req){
-		error_msg("propogate_leave received null argument.");
+	if(!ch || !node){
+		error_msg("send_leave received null argument.");
 		return -1;
 	}
+	memset(&req, 0, sizeof(struct _S2S_leave));
+	req.type_id = S2S_LEAVE;
+	memcpy(req.channel, ch, NAME_LEN);
 
-	for(n=0; n < ch->table_size; n++){
-		node = ch->routing_table[n];
-		if(!node)
-			continue;
-		i = sendto(sockfd, req, sizeof(struct _S2S_leave), 0, (struct sockaddr *)&node->serveraddr, sizeof(struct sockaddr));
-		if(i < 0)
-			perror("Error in sendto");
-	}
+	n = sendto(sockfd, &req, sizeof(struct _S2S_leave), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
+	if(n < 0)
+		perror("Error in sendto");
 	
 	return n;
 }

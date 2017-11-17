@@ -112,7 +112,7 @@ int propogate_join(struct channel_entry *ch, struct _S2S_join *req, int sockfd);
 int save_id(unique_t id, struct _server_manager *svm);
 struct _S2S_say *create_S2S_say(char *username, char *channel, char *text, struct _server_manager *svm);
 int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd);
-int propogate_leave(struct channel_entry *ch, struct _S2S_leave *req, int sockfd);
+int send_leave(char *ch, struct _adjacent_server *node, int sockfd);
 
 /*server.c function prototypes*/
 int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd);

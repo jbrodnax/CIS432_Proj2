@@ -308,6 +308,7 @@ rid_t handle_request(char *data){
 	struct _adjacent_server *node;
 	struct channel_entry *channel;
 	struct _queue_entry *entry;
+	unique_t id;
 	rid_t type;
 	int n;
 
@@ -357,7 +358,43 @@ rid_t handle_request(char *data){
 				free(s2s_leave);
 				return S2S_LEAVE;
 			case S2S_SAY:
-				
+				memcpy(&id, &data[sizeof(rid_t)], sizeof(unique_t));
+				printf("received id: %llu\n", id);
+				if(save_id(id, &server_manager) > 0){
+					s2s_say = malloc(sizeof(struct _S2S_say));
+					memset(s2s_say, 0, sizeof(struct _S2S_say));
+					memcpy(s2s_say->channel, &data[(sizeof(rid_t)+sizeof(unique_t)+NAME_LEN)], NAME_LEN);
+					send_leave(s2s_say->channel, node, server_info.sockfd);
+					return S2S_SAY;
+				}
+				if(!(s2s_say = malloc(sizeof(struct _S2S_say)))){
+					perror("Error in malloc");
+					exit(EXIT_FAILURE);
+				}
+				memset(s2s_say, 0, sizeof(struct _S2S_say));
+				s2s_say->type_id = S2S_SAY;
+				s2s_say->msg_id = id;
+				memcpy(s2s_say->username, &data[(sizeof(rid_t)+sizeof(unique_t))], (NAME_LEN*2)+TEXT_LEN);
+				channel = channel_search(s2s_say->channel, &channel_manager);
+				if(channel){
+					propogate_say(channel, s2s_say, server_info.sockfd);
+					req_say = malloc(sizeof(struct _req_say));
+					req_say->type_id = REQ_SAY;
+					memcpy(req_say->channel, s2s_say->channel, (NAME_LEN+TEXT_LEN));
+					pthread_mutex_lock(&lock1);
+					if(main_queue.size < MAXQSIZE){
+						//FIX: add check
+						entry = malloc(sizeof(struct _queue_entry));
+						memset(entry, 0, sizeof(struct _queue_entry));
+						entry->req_say = req_say;
+						memcpy(entry->username, client->username, NAME_LEN);
+						memcpy(&entry->clientaddr, node->serveraddr, sizeof(struct sockaddr_in));
+						main_queue.queue[main_queue.size] = entry;
+						main_queue.size++;
+					}
+					pthread_mutex_unlock(&lock1);
+				}
+				free(s2s_say);
 				return S2S_SAY;
 			default:
 				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Invalid", node->ipaddr, node->port_str);
