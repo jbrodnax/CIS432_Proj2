@@ -116,7 +116,7 @@ struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _ser
 		return NULL;
 	}
 
-	for(n=0; n < svm->tree_size; n++){
+	for(n=0; n < TREE_MAX; n++){
 		node = svm->tree[n];
 		if(!node)
 			continue;
@@ -288,13 +288,27 @@ struct _S2S_say *create_S2S_say(char *username, char *channel, char *text, struc
 	return rsp;
 }
 
-int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd){
+int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd, struct _server_manager *svm){
 	struct _adjacent_server *node;
 	int n, i;
 
-	if(!ch || !req){
+	if(!req){
 		error_msg("prop_say received null argument.");
 		return -1;
+	}
+
+	if(ch == NULL && svm != NULL){
+		for(n=0; n < TREE_MAX; n++){
+			node = svm->tree[n];
+			if(!node)
+				continue;
+			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s", node->ipaddr, node->port_str, req->username, req->channel, req->text);
+			log_send();
+			i = sendto(sockfd, req, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
+			if(i < 0)
+				perror("Error in sendto");
+		}
+		return n;
 	}
 
 	for(n=0; n < ch->table_size; n++){

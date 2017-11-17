@@ -359,7 +359,7 @@ rid_t handle_request(char *data){
 				return S2S_LEAVE;
 			case S2S_SAY:
 				memcpy(&id, &data[sizeof(rid_t)], sizeof(unique_t));
-				printf("received id: %llu\n", id);
+				//printf("received id: %llu\n", id);
 				if(save_id(id, &server_manager) > 0){
 					s2s_say = malloc(sizeof(struct _S2S_say));
 					memset(s2s_say, 0, sizeof(struct _S2S_say));
@@ -374,10 +374,10 @@ rid_t handle_request(char *data){
 				memset(s2s_say, 0, sizeof(struct _S2S_say));
 				s2s_say->type_id = S2S_SAY;
 				s2s_say->msg_id = id;
-				memcpy(s2s_say->username, &data[(sizeof(rid_t)+sizeof(unique_t))], (NAME_LEN*2)+TEXT_LEN);
-				channel = channel_search(s2s_say->channel, &channel_manager);
+				memcpy(s2s_say->username, &data[(sizeof(rid_t)+sizeof(unique_t))], (NAME_LEN+NAME_LEN)+TEXT_LEN);	
+				channel = channel_search(s2s_say->channel, &channel_manager);	
 				if(channel){
-					propogate_say(channel, s2s_say, server_info.sockfd);
+					propogate_say(channel, s2s_say, server_info.sockfd, NULL);
 					req_say = malloc(sizeof(struct _req_say));
 					req_say->type_id = REQ_SAY;
 					memcpy(req_say->channel, s2s_say->channel, (NAME_LEN+TEXT_LEN));
@@ -531,7 +531,7 @@ rid_t handle_request(char *data){
 			if(channel){
 				s2s_say = create_S2S_say(client->username, req_say->channel, req_say->text, &server_manager);
 				if(s2s_say){
-					propogate_say(channel, s2s_say, server_info.sockfd);
+					propogate_say(NULL, s2s_say, server_info.sockfd, &server_manager);
 				}
 				free(s2s_say);
 			}
