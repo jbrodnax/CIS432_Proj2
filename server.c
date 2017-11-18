@@ -1,7 +1,7 @@
 #include "server.h"
 
 pthread_t tid[2];
-pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
+//pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 char init_channelname[]="Common";
 char ERR_MSG[TEXT_LEN];
 
@@ -635,6 +635,7 @@ int main(int argc, char *argv[]){
 		perror("Error in malloc");
 		exit(EXIT_FAILURE);
 	}
+	lock1 = PTHREAD_MUTEX_INITIALIZER;
 	init_server();
 	init_servertree(argc, argv);
 	

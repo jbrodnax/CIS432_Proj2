@@ -39,55 +39,103 @@ rid_t handle_request2(char *data){
 		}
 		switch (type){
 			case REQ_LOGIN:
-				if(!(req_login = malloc(sizeof(struct _req_login)))){
-					perror("Error in malloc");
-					exit(1);
-				}
-				memset(req_login, 0, sizeof(struct _req_login));
-				req_login->type_id = REQ_LOGIN;
-				//FIX: remove the -1 from NAME_LEN once client login is implemented
-				memcpy(req_login->username, &data[sizeof(rid_t)], NAME_LEN-1);
-				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Login %s", client_info.ipaddr_str, client_info.portno_str, req_login->username);
+				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_login));
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Login %s",
+					client_info.ipaddr_str, client_info.portno_str, sreq_union.sreq_name.name);
 				log_recv();
-				//printf("[>] Login request from: (%s)\n", req_login->username);
-				client_add(req_login->username, &client_info.clientaddr, &client_manager);
+				client_add(sreq_union.sreq_name.name, &client_info.clientaddr, &client_manager);
+				goto RET;
 
-				free(req_login);
-				goto RET;
 			case REQ_LOGOUT:
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Logout %s", 
+					client_info.ipaddr_str, client_info.portno_str, client->username);
+				log_recv();
+				client_logout(client, &client_manager, &channel_manager);
 				goto RET;
+
 			case REQ_LIST:
-				goto RET;
-			case REQ_ALIVE:
-				goto RET;
-			default:
-				memset(channel_name, 0, NAME_LEN+STR_PADD);
-				memcpy(channel_name, &data[sizeof(rid_t)], NAME_LEN);
-				channel = channel_search(channel_name, &channel_manager);
-				if(!channel){
-					send_error("Channel does not exist.", &client_info.clientaddr, server_info.sockfd);
-					return REQ_INVALID;
+				if(!(req_list = malloc(sizeof(struct _req_list))))
+					goto MEM_ERR;
+				memset(req_list, 0, sizeof(struct _req_list));
+				req_list->type_id = REQ_LIST;
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request List %s", 
+					client_info.ipaddr_str, client_info.portno_str, client->username);
+				log_recv();
+				pthread_mutex_lock(&lock1);
+				if(main_queue.size < MAXQSIZE){
+					if(!(entry = malloc(sizeof(struct _queue_entry))))
+						goto MEM_ERR;
+					memset(entry, 0, sizeof(struct _queue_entry));
+					entry->req_list = req_list;
+					memcpy(&entry->clientaddr, &client->clientaddr, sizeof(struct sockaddr_in));
+					main_queue.queue[main_queue.size] = entry;
+					main_queue.size++;
 				}
+				pthread_mutex_unlock(&lock1);
+				goto RET;
+
+			case REQ_ALIVE:
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request KeepAlive %s", 
+					client_info.ipaddr_str, client_info.portno_str, client->username);
+				log_recv();
+				goto RET;
+
 		}
 		switch (type){
 			case REQ_JOIN:
 				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_join));
 				printf("Join:\t%d\t%s\n", sreq_union.sreq_name.type_id, sreq_union.sreq_name.name);
-				channel = channel_search(&sreq_union.sreq_name.name, &channel_manager);
+				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
+					channel = channel_create(sreq_union.sreq_name.name, &channel_manager, &server_manager);
+					if(!(s2s_join = malloc(sizeof(struct _S2S_join))))
+						goto MEM_ERR;
+					s2s_join->type_id = S2S_JOIN;
+					memcpy(s2s_join->channel, channel->channel_name, NAME_LEN);
+					propogate_join(channel, s2s_join, server_info.sockfd);
+				}
+				client_add_channel(channel, client);
+				channel_add_client(client, channel);
 				goto RET;
+
 			case REQ_LEAVE:
 				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_leave));
 				printf("Leave:\t%d\t%s\n", sreq_union.sreq_name.type_id, sreq_union.sreq_name.name);
+				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager)))
+					goto CHDNE;
+				client_remove_channel(channel, client);
+				channel_remove_client(client, channel);
+				if(channel->num_clients < 1)
+					channel_remove(channel, &channel_manager);
 				goto RET;
 			case REQ_SAY:
 				memcpy(&sreq_union.sreq_say, data, (sizeof(rid_t)+NAME_LEN));
 				memcpy(&sreq_union.sreq_say.text, &data[(sizeof(rid_t)+NAME_LEN)], TEXT_LEN);
 				printf("Say:\t%d\t%s\t%s\n", sreq_union.sreq_say.type_id, sreq_union.sreq_say.channel, sreq_union.sreq_say.text);
+				if(!(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)))
+					goto CHDNE;
 				goto RET;
+
 			case REQ_WHO:
 				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_who));
 				printf("Who:\t%d\t%s\n", sreq_union.sreq_name.type_id, sreq_union.sreq_name.name);
+				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager)))
+					goto CHDNE;
+				if(!(req_who = malloc(sizeof(struct _req_who))))
+					goto MEM_ERR;
+				memset(req_who, 0, sizeof(struct _req_who));
+				memcpy(req_who, &sreq_union.sreq_name, sizeof(struct _req_who));
+				if(main_queue.size < MAXQSIZE){
+					if(!(entry = malloc(sizeof(struct _queue_entry))))
+						goto MEM_ERR;
+					memset(entry, 0, sizeof(struct _queue_entry));
+					entry->req_who = req_who;
+					memcpy(&entry->clientaddr, &client->clientaddr, sizeof(struct sockaddr_in));
+					main_queue.queue[main_queue.size] = entry;
+					main_queue.size++;
+				}
+				pthread_mutex_unlock(&lock1);
 				goto RET;
+
 			default:
 				return REQ_INVALID;
 		}
@@ -95,6 +143,9 @@ rid_t handle_request2(char *data){
 	CHDNE:
 		send_error("Channel does not exist.", &client_info.clientaddr, server_info.sockfd);
 		return REQ_INVALID;
+	MEM_ERR:
+		perror("Error in malloc");
+		exit(EXIT_FAILURE);
 	RET:
 		return type;
 }

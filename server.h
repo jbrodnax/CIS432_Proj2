@@ -126,7 +126,7 @@ struct _client_info client_info;
 struct _server_manager server_manager;
 struct addrinfo hints, *servinfo, *p;
 
-
+pthread_mutex_t lock1;
 char *LOG_RECV;
 char *LOG_SEND;
 
