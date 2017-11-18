@@ -1,65 +1,10 @@
 #include "server.h"
 
-struct _server_info{
-	char ipaddr_str[256];
-	char portno_str[32];
-	char *hostname;
-	int sockfd;
-	int portno;
-	struct sockaddr_in *serveraddr;
-	struct sockaddr_in6 *serveraddr6;
-};
-
-struct _client_info{
-	char ipaddr_str[256];
-	char portno_str[32];
-	struct sockaddr_in clientaddr;
-	struct sockaddr_in6 clientaddr6;
-	struct hostent *hostp;
-	char *hostaddrp;
-	int portno;
-};
-
-struct _queue_entry{
-	struct sockaddr_in clientaddr;
-	char username[NAME_LEN+STR_PADD];
-	struct _req_say *req_say;
-	struct _req_list *req_list;
-	struct _req_who *req_who;
-};
-
-struct _req_queue{
-	struct _queue_entry *queue[MAXQSIZE];
-	int size;
-};
-
-struct _req_login* req_login;
-struct _req_logout* req_logout;
-struct _req_join* req_join;
-struct _req_leave* req_leave;
-struct _req_say* req_say;
-struct _req_list* req_list;
-struct _req_who* req_who;
-struct _req_alive* req_alive;
-struct _req_queue main_queue;
-
-struct _S2S_join *s2s_join;
-struct _S2S_leave *s2s_leave;
-struct _S2S_say *s2s_say;
-
-struct _client_manager client_manager;
-struct _channel_manager channel_manager;
-struct _server_info server_info;
-struct _client_info client_info;
-struct _server_manager server_manager;
-struct addrinfo hints, *servinfo, *p;
-
 pthread_t tid[2];
 pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 char init_channelname[]="Common";
 char ERR_MSG[TEXT_LEN];
-//char *LOG_RECV;
-//char *LOG_SEND;
+
 time_t timestamp;
 
 void error(char *msg){
@@ -302,7 +247,7 @@ void *thread_softstate(void *vargp){
 		client_softstate(&client_manager, &channel_manager);
 	}
 }
-/*
+
 rid_t handle_request(char *data){
 	struct client_entry *client;
 	struct _adjacent_server *node;
@@ -605,100 +550,6 @@ rid_t handle_request(char *data){
 	log_recv();
 	return REQ_INVALID;
 }
-*/
-rid_t handle_request(char *data){
-	_sreq_union sreq_union;
-	struct client_entry *client;
-	struct _adjacent_server *node;
-	struct channel_entry *channel;
-	struct _queue_entry *entry;
-	char channel_name[NAME_LEN+STR_PADD];
-	unique_t id;
-	rid_t type;
-
-	memset(&sreq_union, 0, sizeof(sreq_union));
-	memcpy(&type, data, sizeof(rid_t));
-
-	if(type > S2S_SAY)
-		return REQ_INVALID;
-	if(type > REQ_ALIVE){
-		goto S2S;
-	}
-	if(type < S2S_JOIN){
-		goto USR;
-	}
-
-	S2S:
-	
-
-	USR:
-		client = client_search(&client_info.clientaddr, &client_manager);
-		if(client){
-			client_keepalive(client);
-			if(type == REQ_LOGIN){
-				send_error("You are already logged in.", &client_info.clientaddr, server_info.sockfd);
-				return REQ_INVALID;
-			}
-		}else if(type != REQ_LOGIN){
-			send_error("You are not logged in yet.", &client_info.clientaddr, server_info.sockfd);
-			return REQ_INVALID;
-		}
-		switch (type){
-			case REQ_LOGIN:
-				if(!(req_login = malloc(sizeof(struct _req_login)))){
-					perror("Error in malloc");
-					exit(1);
-				}
-				memset(req_login, 0, sizeof(struct _req_login));
-				req_login->type_id = REQ_LOGIN;
-				//FIX: remove the -1 from NAME_LEN once client login is implemented
-				memcpy(req_login->username, &data[sizeof(rid_t)], NAME_LEN-1);
-				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Login %s", client_info.ipaddr_str, client_info.portno_str, req_login->username);
-				log_recv();
-				//printf("[>] Login request from: (%s)\n", req_login->username);
-				client_add(req_login->username, &client_info.clientaddr, &client_manager);
-
-				free(req_login);
-				goto RET;
-			case REQ_LOGOUT:
-				goto RET;
-			case REQ_LIST:
-				goto RET;
-			case REQ_ALIVE:
-				goto RET;
-			default:
-				memset(channel_name, 0, NAME_LEN+STR_PADD);
-				memcpy(channel_name, &data[sizeof(rid_t)], NAME_LEN);
-				channel = channel_search(channel_name, &channel_manager);
-				if(!channel){
-					send_error("Channel does not exist.", &client_info.clientaddr, server_info.sockfd);
-					return REQ_INVALID;
-				}
-		}
-		switch (type){
-			case REQ_JOIN:
-				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_join));
-				printf("Join:\t%d\t%s\n", sreq_union.sreq_name.type_id, sreq_union.sreq_name.name);
-				goto RET;
-			case REQ_LEAVE:
-				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_leave));
-				printf("Leave:\t%d\t%s\n", sreq_union.sreq_name.type_id, sreq_union.sreq_name.name);
-				goto RET;
-			case REQ_SAY:
-				memcpy(&sreq_union.sreq_say, data, sizeof(struct _req_say));
-				printf("Say:\t%d\t%s\t%s\n", sreq_union.sreq_say.type_id, sreq_union.sreq_say.channel, sreq_union.sreq_say.text);
-				goto RET;
-			case REQ_WHO:
-				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_who));
-				printf("Who:\t%d\t%s\n", sreq_union.sreq_name.type_id, sreq_union.sreq_name.name);
-				goto RET;
-			default:
-				return REQ_INVALID;
-		}
-
-	RET:
-		return type;
-}
 
 void recvdata_IPv6(){
 	char input[BUFSIZE+STR_PADD];
@@ -749,7 +600,7 @@ void recvdata_IPv4(){
 		getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), 
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
 		//printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
-		handle_request(input);
+		handle_request2(input);
 	}
 
 	return;

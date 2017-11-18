@@ -33,39 +33,7 @@ struct _adjacent_server *node_create(char *hostname, char *port, struct _server_
 	new_node->serveraddr = (struct sockaddr_in*)new_node->servinfo->ai_addr;
 	getnameinfo((struct sockaddr*)new_node->serveraddr, sizeof(struct sockaddr),
 		new_node->ipaddr, 64, new_node->port_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
-	//new_node->serveraddr->sin_family = AF_INET;
-	/*
-	optval = 1;
-	for(p = new_node->servinfo; p!=NULL; p = p->ai_next){
-		if((new_node->sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1){
-			perror("[?] Error in socket");
-			continue;
-		}
-		setsockopt(new_node->sockfd, SOL_SOCKET, SO_REUSEADDR, (const void*)&optval, sizeof(int));
-		if(bind(new_node->sockfd, p->ai_addr, p->ai_addrlen) == -1){
-			close(new_node->sockfd);
-			perror("Error in bind");
-			continue;
-		}
-		break;
-	}
-	if(p == NULL){
-		fprintf(stderr, "[!] Failed to bind socket\n");
-		exit(EXIT_FAILURE);
-	}
-	new_node->p = p;
-	new_node->serveraddr = (struct sockaddr_in*)new_node->p->ai_addr;
-	switch(p->ai_family){
-		case AF_INET:
-			puts("Adjacent server socket is IPv4");
-			break;
-		case AF_INET6:
-			puts("Adjacent server socket is IPv6");
-			break;
-		default:
-			puts("Error: invalid ai_family");
-	}
-	*/
+	
 	return new_node;
 }
 

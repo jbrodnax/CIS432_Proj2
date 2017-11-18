@@ -72,6 +72,61 @@ struct _channel_manager{
 	int num_channels;
 };
 
+struct _server_info{
+	char ipaddr_str[256];
+	char portno_str[32];
+	char *hostname;
+	int sockfd;
+	int portno;
+	struct sockaddr_in *serveraddr;
+	struct sockaddr_in6 *serveraddr6;
+};
+
+struct _client_info{
+	char ipaddr_str[256];
+	char portno_str[32];
+	struct sockaddr_in clientaddr;
+	struct sockaddr_in6 clientaddr6;
+	struct hostent *hostp;
+	char *hostaddrp;
+	int portno;
+};
+
+struct _queue_entry{
+	struct sockaddr_in clientaddr;
+	char username[NAME_LEN+STR_PADD];
+	struct _req_say *req_say;
+	struct _req_list *req_list;
+	struct _req_who *req_who;
+};
+
+struct _req_queue{
+	struct _queue_entry *queue[MAXQSIZE];
+	int size;
+};
+
+struct _req_login* req_login;
+struct _req_logout* req_logout;
+struct _req_join* req_join;
+struct _req_leave* req_leave;
+struct _req_say* req_say;
+struct _req_list* req_list;
+struct _req_who* req_who;
+struct _req_alive* req_alive;
+struct _req_queue main_queue;
+
+struct _S2S_join *s2s_join;
+struct _S2S_leave *s2s_leave;
+struct _S2S_say *s2s_say;
+
+struct _client_manager client_manager;
+struct _channel_manager channel_manager;
+struct _server_info server_info;
+struct _client_info client_info;
+struct _server_manager server_manager;
+struct addrinfo hints, *servinfo, *p;
+
+
 char *LOG_RECV;
 char *LOG_SEND;
 
@@ -120,5 +175,6 @@ void log_recv();
 void log_send();
 void *thread_responder(void *vargp);
 void *thread_softstate(void *vargp);
+rid_t handle_request2(char *data);
 void recvdata_IPv4();
 void recvdata_IPv6();
