@@ -232,10 +232,10 @@ int save_id(unique_t id, struct _server_manager *svm){
 	return retval;
 }
 
-struct _S2S_say *create_S2S_say(char *username, char *channel, char *text, struct _server_manager *svm){
+struct _S2S_say *create_S2S_say(_sreq_say *req, char *name, struct _server_manager *svm){
 	struct _S2S_say *rsp;
 
-	if(!username || !channel || !text){
+	if(!req || !name){
 		error_msg("create_s2s_say received null argument.");
 		return NULL;
 	}
@@ -245,17 +245,67 @@ struct _S2S_say *create_S2S_say(char *username, char *channel, char *text, struc
 	}
 	memset(rsp, 0, sizeof(struct _S2S_say));
 	rsp->type_id = S2S_SAY;
-	memcpy(rsp->username, username, NAME_LEN);
-	memcpy(rsp->channel, channel, NAME_LEN);
-	memcpy(rsp->text, text, TEXT_LEN);
-	generate_id(rsp);
-	if(save_id(rsp->msg_id, svm) > 0){
+	memcpy(rsp->username, name, NAME_LEN);
+	memcpy(rsp->channel, req->channel, NAME_LEN);
+	memcpy(rsp->text, req->text, TEXT_LEN);
+	if(save_id(generate_id(rsp), svm) > 0){
 		error_msg("generated say request with non-unique id.");
 	}
 
 	return rsp;
 }
 
+int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, int sockfd, struct _server_manager *svm){
+	struct _adjacent_server *node;
+	struct _S2S_say *rsp;
+	int n, i;
+
+	if(!req){
+		error_msg("prop_say received null argument.");
+		return -1;
+	}
+	if(!(rsp = malloc(sizeof(struct _S2S_say)))){
+		perror("Error in malloc");
+		exit(EXIT_FAILURE);
+	}
+	memset(rsp, 0, sizeof(struct _S2S_say));
+	rsp->type_id = S2S_SAY;
+	memcpy(rsp->username, name, NAME_LEN);
+        memcpy(rsp->channel, req->channel, NAME_LEN);
+        memcpy(rsp->text, req->text, TEXT_LEN);
+	generate_id(rsp);
+	if(save_id(generate_id(rsp), svm) < 0){
+		error_msg("generated say request with non-unique id.");
+		return -1;
+	}
+	if(ch == NULL && svm != NULL)
+		goto PROPALL;
+	else
+		goto PROPCH;
+
+	PROPALL:
+		for(n=0;n<TREE_MAX;n++){
+			if(!(node = svm->tree[n]))
+				continue;
+			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s", node->ipaddr, node->port_str, name, req->channel, req->text);
+			log_send();
+			if(sendto(sockfd, rsp, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr)) < 0)
+				perror("Error in sendto");
+		}
+		return n;
+
+	PROPCH:
+		for(n=0;n<ch->table_size;n++){
+			if(!(node = ch->routing_table[n]))
+				continue;
+			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s", node->ipaddr, node->port_str, name, req->channel, req->text);
+			log_send();
+			if(sendto(sockfd, rsp, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr)) < 0)
+				perror("Error in sendto");
+		}
+		return n;
+}
+/*
 int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd, struct _server_manager *svm){
 	struct _adjacent_server *node;
 	int n, i;
@@ -292,7 +342,7 @@ int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd, st
 
 	return n;
 }
-
+*/
 int send_leave(char *ch, struct _adjacent_server *node, int sockfd){
 	//struct _adjacent_server *node;
 	struct _S2S_leave req;

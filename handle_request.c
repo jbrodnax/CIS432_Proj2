@@ -92,6 +92,7 @@ rid_t handle_request2(char *data){
 					s2s_join->type_id = S2S_JOIN;
 					memcpy(s2s_join->channel, channel->channel_name, NAME_LEN);
 					propogate_join(channel, s2s_join, server_info.sockfd);
+					free(s2s_join);
 				}
 				client_add_channel(channel, client);
 				channel_add_client(client, channel);
@@ -113,6 +114,12 @@ rid_t handle_request2(char *data){
 				printf("Say:\t%d\t%s\t%s\n", sreq_union.sreq_say.type_id, sreq_union.sreq_say.channel, sreq_union.sreq_say.text);
 				if(!(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)))
 					goto CHDNE;
+				//if(!(s2s_say = create_S2S_say(sreq_union.sreq_say, client->username, &server_manager))){
+				//	fprintf(stderr, "Error: failed to create S2S Say request. Request will not be propogated.\n");
+				//	return REQ_INVALID;
+				//}
+				propogate_say(NULL, client->username, &sreq_union.sreq_say, server_info.sockfd, &server_manager);
+				free(s2s_say);
 				goto RET;
 
 			case REQ_WHO:

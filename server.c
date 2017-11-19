@@ -322,7 +322,7 @@ rid_t handle_request(char *data){
 				memcpy(s2s_say->username, &data[(sizeof(rid_t)+sizeof(unique_t))], (NAME_LEN+NAME_LEN)+TEXT_LEN);	
 				channel = channel_search(s2s_say->channel, &channel_manager);	
 				if(channel){
-					propogate_say(channel, s2s_say, server_info.sockfd, NULL);
+					//propogate_say(channel, s2s_say, server_info.sockfd, NULL);
 					req_say = malloc(sizeof(struct _req_say));
 					req_say->type_id = REQ_SAY;
 					memcpy(req_say->channel, s2s_say->channel, (NAME_LEN+TEXT_LEN));
@@ -474,11 +474,11 @@ rid_t handle_request(char *data){
 			//Enqueue request for sender thread
 			channel = channel_search(req_say->channel, &channel_manager);
 			if(channel){
-				s2s_say = create_S2S_say(client->username, req_say->channel, req_say->text, &server_manager);
-				if(s2s_say){
-					propogate_say(NULL, s2s_say, server_info.sockfd, &server_manager);
-				}
-				free(s2s_say);
+				//s2s_say = create_S2S_say(client->username, req_say->channel, req_say->text, &server_manager);
+				//if(s2s_say){
+				//	propogate_say(NULL, s2s_say, server_info.sockfd, &server_manager);
+				//}
+				//free(s2s_say);
 			}
 			pthread_mutex_lock(&lock1);
 			if(main_queue.size < MAXQSIZE){
@@ -635,7 +635,10 @@ int main(int argc, char *argv[]){
 		perror("Error in malloc");
 		exit(EXIT_FAILURE);
 	}
-	lock1 = PTHREAD_MUTEX_INITIALIZER;
+	if(pthread_mutex_init(&lock1, NULL) != 0){
+		perror("Error in pthread_mutex_init");
+		exit(EXIT_FAILURE);
+	}
 	init_server();
 	init_servertree(argc, argv);
 	
