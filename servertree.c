@@ -118,7 +118,7 @@ unique_t generate_id(struct _S2S_say *req){
 	fclose(fp);
 
 	req->msg_id = id;
-	printf("generated id: %llu\n", id);
+	//printf("generated id: %llu\n", id);
 	return id;
 }
 
@@ -183,7 +183,7 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 	return 0;
 }
 
-int propogate_join(struct channel_entry *ch, _sreq_name *req, int sockfd){
+int propogate_join(struct channel_entry *ch, _sreq_name *req, struct _adjacent_server *sender, int sockfd){
 	struct _adjacent_server *node;
 	struct _S2S_join *join;
 	int n, i;
@@ -201,9 +201,15 @@ int propogate_join(struct channel_entry *ch, _sreq_name *req, int sockfd){
 	memcpy(join->channel, req->name, NAME_LEN);
 
 	for(n=0; n < ch->table_size; n++){
-		node = ch->routing_table[n];
-		if(!node)
-			continue;	
+		if(!(node = ch->routing_table[n]))
+			continue;
+		/*Don't send join request to server that sent it*/
+		if(sender){
+			if(sender->serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
+				if(sender->serveraddr->sin_port == node->serveraddr->sin_port)
+					continue;
+			}
+		}
 		snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Join %s", node->ipaddr, node->port_str, req->name);
 		log_send();
 		i = sendto(sockfd, join, sizeof(struct _S2S_join), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
@@ -280,16 +286,21 @@ int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, int sock
 	memcpy(rsp->username, name, NAME_LEN);
         memcpy(rsp->channel, req->channel, NAME_LEN);
         memcpy(rsp->text, req->text, TEXT_LEN);
-	if(save_id(generate_id(rsp), svm) < 0){
-		error_msg("generated say request with non-unique id.");
-		return -1;
-	}
-	if(ch == NULL && svm != NULL)
+	//if(save_id(generate_id(rsp), svm) < 0){
+	//	error_msg("generated say request with non-unique id.");
+	//	return -1;
+	//}
+	if(ch == NULL && svm != NULL){
 		goto PROPALL;
-	else
+	}else{
 		goto PROPCH;
+	}
 
 	PROPALL:
+		if(save_id(generate_id(rsp), svm) < 0){
+			error_msg("generated say request with non-unique id.");
+			return -1;
+		}
 		for(n=0;n<TREE_MAX;n++){
 			if(!(node = svm->tree[n]))
 				continue;

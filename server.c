@@ -599,7 +599,7 @@ void recvdata_IPv4(){
 		}
 		getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), 
 			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
-		//printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
+		//printf("%s:%s received data from:\tHost: %s\tService: %s\n\n", server_info.ipaddr_str, server_info.portno_str, client_info.ipaddr_str, client_info.portno_str);
 		handle_request2(input);
 	}
 
