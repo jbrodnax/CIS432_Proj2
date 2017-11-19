@@ -70,7 +70,7 @@ rid_t handle_request2(char *data){
 					goto RET;
 				}
 				if(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)){
-					propogate_say(channel, s2s_username, &sreq_union.sreq_say, node, server_info.sockfd, NULL);
+					propogate_say(channel, s2s_username, id, &sreq_union.sreq_say, node, server_info.sockfd, NULL);
 					if(!(req_say = malloc(sizeof(struct _req_say))))
 						goto MEM_ERR;
 					req_say->type_id = REQ_SAY;
@@ -188,7 +188,7 @@ rid_t handle_request2(char *data){
 				log_recv();
 				if(!(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)))
 					goto CHDNE;
-				propogate_say(NULL, client->username, &sreq_union.sreq_say, NULL, server_info.sockfd, &server_manager);
+				propogate_say(NULL, client->username, 0, &sreq_union.sreq_say, NULL, server_info.sockfd, &server_manager);
 				if(!(req_say = malloc(sizeof(struct _req_say))))
 					goto MEM_ERR;
 				memset(req_say, 0, sizeof(struct _req_say));

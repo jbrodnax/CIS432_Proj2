@@ -235,8 +235,9 @@ int save_id(unique_t id, struct _server_manager *svm){
 				return retval;
 			}
 		}
-		if(svm->recent_ids[n] == id)
+		if(svm->recent_ids[n] == id){	
 			retval = 1;
+		}
 	}
 	if(retval == 0){
 		svm->recent_ids[n] = id;
@@ -268,7 +269,7 @@ struct _S2S_say *create_S2S_say(_sreq_say *req, char *name, struct _server_manag
 	return rsp;
 }
 
-int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm){
+int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *req, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm){
 	struct _adjacent_server *node;
 	struct _S2S_say *rsp;
 	int n, i;
@@ -310,7 +311,7 @@ int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, struct _
 						continue;
 				}
 			}
-			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s", node->ipaddr, node->port_str, name, req->channel, req->text);
+			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s %llu", node->ipaddr, node->port_str, name, req->channel, req->text, rsp->msg_id);
 			log_send();
 			if(sendto(sockfd, rsp, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr)) < 0)
 				perror("Error in sendto");
@@ -319,6 +320,7 @@ int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, struct _
 		return n;
 
 	PROPCH:
+		rsp->msg_id = id;
 		for(n=0;n<ch->table_size;n++){
 			if(!(node = ch->routing_table[n]))
 				continue;
@@ -328,7 +330,7 @@ int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, struct _
 						continue;
 				}
 			}
-			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s", node->ipaddr, node->port_str, name, req->channel, req->text);
+			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s %llu", node->ipaddr, node->port_str, name, req->channel, req->text, id);
 			log_send();
 			if(sendto(sockfd, rsp, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr)) < 0)
 				perror("Error in sendto");
@@ -386,7 +388,8 @@ int send_leave(char *ch, struct _adjacent_server *node, int sockfd){
 	memset(&req, 0, sizeof(struct _S2S_leave));
 	req.type_id = S2S_LEAVE;
 	memcpy(req.channel, ch, NAME_LEN);
-
+	snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Leave %s", node->ipaddr, node->port_str, ch);
+	log_send();
 	n = sendto(sockfd, &req, sizeof(struct _S2S_leave), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
 	if(n < 0)
 		perror("Error in sendto");
