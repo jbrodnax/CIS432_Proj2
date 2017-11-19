@@ -183,27 +183,34 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 	return 0;
 }
 
-int propogate_join(struct channel_entry *ch, struct _S2S_join *req, int sockfd){
+int propogate_join(struct channel_entry *ch, _sreq_name *req, int sockfd){
 	struct _adjacent_server *node;
+	struct _S2S_join *join;
 	int n, i;
 
 	if(!ch || !req){
 		error_msg("propogate_join received null argument.");
 		return -1;
 	}
+	if(!(join = malloc(sizeof(struct _S2S_join)))){
+		perror("Error in malloc");
+		exit(EXIT_FAILURE);
+	}
+	memset(join, 0, sizeof(struct _S2S_join));
+	join->type_id = S2S_JOIN;
+	memcpy(join->channel, req->name, NAME_LEN);
 
 	for(n=0; n < ch->table_size; n++){
 		node = ch->routing_table[n];
 		if(!node)
-			continue;
-		//printf("propping JOIN to: %s:%s\nsending: %hu %s\n", node->ipaddr, node->port_str, req->type_id, req->channel);
-		snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Join %s", node->ipaddr, node->port_str, req->channel);
+			continue;	
+		snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Join %s", node->ipaddr, node->port_str, req->name);
 		log_send();
-		i = sendto(sockfd, req, sizeof(struct _S2S_join), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
+		i = sendto(sockfd, join, sizeof(struct _S2S_join), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
 		if(i < 0)
 			perror("Error in sendto JOIN");
 	}
-	
+	free(join);
 	return n;
 }
 /*This storage method for ids is terrible*/
@@ -273,7 +280,6 @@ int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, int sock
 	memcpy(rsp->username, name, NAME_LEN);
         memcpy(rsp->channel, req->channel, NAME_LEN);
         memcpy(rsp->text, req->text, TEXT_LEN);
-	generate_id(rsp);
 	if(save_id(generate_id(rsp), svm) < 0){
 		error_msg("generated say request with non-unique id.");
 		return -1;
@@ -292,6 +298,7 @@ int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, int sock
 			if(sendto(sockfd, rsp, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr)) < 0)
 				perror("Error in sendto");
 		}
+		free(rsp);
 		return n;
 
 	PROPCH:
@@ -303,6 +310,7 @@ int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, int sock
 			if(sendto(sockfd, rsp, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr)) < 0)
 				perror("Error in sendto");
 		}
+		free(rsp);
 		return n;
 }
 /*

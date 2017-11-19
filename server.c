@@ -279,7 +279,7 @@ rid_t handle_request(char *data){
 						free(s2s_join);
 						return REQ_INVALID;
 					}
-					propogate_join(channel, s2s_join, server_info.sockfd);
+					//propogate_join(channel, s2s_join, server_info.sockfd);
 				}
 				free(s2s_join);
 				return S2S_JOIN;
@@ -410,7 +410,7 @@ rid_t handle_request(char *data){
 				}
 				s2s_join->type_id = S2S_JOIN;
 				memcpy(s2s_join->channel, channel->channel_name, NAME_LEN);
-				propogate_join(channel, s2s_join, server_info.sockfd);
+				//propogate_join(channel, s2s_join, server_info.sockfd);
 			}
 			n = client_add_channel(channel, client);
 			//Only send error message if client_add_channel return with an error e.g. -1

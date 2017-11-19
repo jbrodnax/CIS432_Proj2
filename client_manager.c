@@ -346,6 +346,7 @@ struct channel_entry *channel_search(char *name, struct _channel_manager *chm){
 	if(!name || !chm)
 		return NULL;
 
+	printf("channel_search received name: %s\n", name);
 	pthread_rwlock_rdlock(&channel_lock);
 	channel = chm->list_head;
 	while(channel){
@@ -358,6 +359,7 @@ struct channel_entry *channel_search(char *name, struct _channel_manager *chm){
 	//printf("[-] Channel (%s) NOT found.\n", name);
 
 	pthread_rwlock_unlock(&channel_lock);
+	puts("Channel not found");
 	return NULL;
 }
 
