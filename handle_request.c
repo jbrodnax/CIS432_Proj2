@@ -38,11 +38,13 @@ rid_t handle_request2(char *data){
 				log_recv();
 				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
 					channel = channel_create(sreq_union.sreq_name.name, &channel_manager, &server_manager);
+					propogate_join(channel, node, server_info.sockfd);
 				}else if(channel_manager.sub_initchannel == 0){
 					if(!strncmp(channel->channel_name, common, NAME_LEN))
+						propogate_join(channel, node, server_info.sockfd);
 						channel_manager.sub_initchannel = 1;
 				}
-				propogate_join(channel, node, server_info.sockfd);
+				//propogate_join(channel, node, server_info.sockfd);
 				goto RET;
 
 			case S2S_LEAVE:
