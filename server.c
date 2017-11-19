@@ -34,11 +34,14 @@ void log_send(){
 }
 
 void test_chm(){
+	struct channel_entry *channel;
+
 	init_rwlocks();
-	if(!channel_create(init_channelname, &channel_manager, &server_manager)){
+	if(!(channel = channel_create(init_channelname, &channel_manager, &server_manager))){
 		fprintf(stderr, "[!] Error: Channel creation of (%s) failed.");
 		exit(EXIT_FAILURE);
 	}
+	//propogate_join(channel, NULL, server_info.sockfd);
 	return;
 }
 

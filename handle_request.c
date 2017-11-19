@@ -1,5 +1,7 @@
 #include "server.h"
 
+char common[]="Common";
+
 rid_t handle_request2(char *data){
 	_sreq_union sreq_union;
 	struct client_entry *client;
@@ -34,9 +36,13 @@ rid_t handle_request2(char *data){
 				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_join));
 				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Join %s", node->ipaddr, node->port_str, sreq_union.sreq_name.name);
 				log_recv();
-				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager)))
+				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
 					channel = channel_create(sreq_union.sreq_name.name, &channel_manager, &server_manager);
-				propogate_join(channel, &sreq_union.sreq_name, node, server_info.sockfd);
+				}else if(channel_manager.sub_initchannel == 0){
+					if(!strncmp(channel->channel_name, common, NAME_LEN))
+						channel_manager.sub_initchannel = 1;
+				}
+				propogate_join(channel, node, server_info.sockfd);
 				goto RET;
 
 			case S2S_LEAVE:
@@ -57,12 +63,14 @@ rid_t handle_request2(char *data){
 				memcpy(s2s_username, &data[(sizeof(rid_t)+sizeof(unique_t))], NAME_LEN);
 				memcpy(sreq_union.sreq_say.channel, &data[(sizeof(rid_t)+sizeof(unique_t)+NAME_LEN)], NAME_LEN);
 				memcpy(sreq_union.sreq_say.text, &data[(sizeof(rid_t)+sizeof(unique_t)+NAME_LEN+NAME_LEN)], TEXT_LEN);
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Say %s %s %s", node->ipaddr, node->port_str, s2s_username, sreq_union.sreq_say.channel, sreq_union.sreq_say.text);
+				log_recv();
 				if(save_id(id, &server_manager) > 0){
 					send_leave(sreq_union.sreq_say.channel, node, server_info.sockfd);
 					goto RET;
 				}
 				if(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)){
-					propogate_say(channel, s2s_username, &sreq_union.sreq_say, server_info.sockfd, NULL);
+					propogate_say(channel, s2s_username, &sreq_union.sreq_say, node, server_info.sockfd, NULL);
 					if(!(req_say = malloc(sizeof(struct _req_say))))
 						goto MEM_ERR;
 					req_say->type_id = REQ_SAY;
@@ -144,15 +152,18 @@ rid_t handle_request2(char *data){
 				log_recv();
 				goto RET;
 
-		}
-		switch (type){
 			case REQ_JOIN:
 				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_join));	
 				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Join %s %s", client_info.ipaddr_str, client_info.portno_str, client->username, sreq_union.sreq_name.name);
 				log_recv();
 				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
 					channel = channel_create(sreq_union.sreq_name.name, &channel_manager, &server_manager);
-					propogate_join(channel, &sreq_union.sreq_name, NULL, server_info.sockfd);
+					propogate_join(channel, NULL, server_info.sockfd);
+				}else if(channel_manager.sub_initchannel == 0){
+					if(!strncmp(channel->channel_name, common, NAME_LEN)){
+						propogate_join(channel, NULL, server_info.sockfd);
+						channel_manager.sub_initchannel = 1;
+					}
 				}
 				client_add_channel(channel, client);
 				channel_add_client(client, channel);
@@ -177,7 +188,7 @@ rid_t handle_request2(char *data){
 				log_recv();
 				if(!(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)))
 					goto CHDNE;
-				propogate_say(NULL, client->username, &sreq_union.sreq_say, server_info.sockfd, &server_manager);
+				propogate_say(NULL, client->username, &sreq_union.sreq_say, NULL, server_info.sockfd, &server_manager);
 				if(!(req_say = malloc(sizeof(struct _req_say))))
 					goto MEM_ERR;
 				memset(req_say, 0, sizeof(struct _req_say));

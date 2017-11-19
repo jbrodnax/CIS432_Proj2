@@ -70,6 +70,7 @@ struct _channel_manager{
 	struct channel_entry *list_head;
 	struct channel_entry *list_tail;
 	int num_channels;
+	uint32_t sub_initchannel;
 };
 
 struct _server_info{
@@ -163,10 +164,10 @@ struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _ser
 unique_t generate_id(struct _S2S_say *req);
 int rtable_init(struct channel_entry *ch, struct _server_manager *svm);
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm);
-int propogate_join(struct channel_entry *ch, _sreq_name *req, struct _adjacent_server *sender, int sockfd);
+int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, int sockfd);
 int save_id(unique_t id, struct _server_manager *svm);
 //struct _S2S_say *create_S2S_say(struct _sreq_say *req, char *name, struct _server_manager *svm);
-int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, int sockfd, struct _server_manager *svm);
+int propogate_say(struct channel_entry *ch, char *name, _sreq_say *req, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm);
 //int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd, struct _server_manager *svm);
 int send_leave(char *ch, struct _adjacent_server *node, int sockfd);
 
