@@ -142,7 +142,7 @@ char *LOG_SEND;
 
 /*client_manager.c function prototypes*/
 void error_msg(char *err_msg);
-void init_rwlocks();
+//void init_rwlocks();
 void client_print(struct client_entry *client);
 struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _client_manager *clm);
 struct client_entry *client_init_list();

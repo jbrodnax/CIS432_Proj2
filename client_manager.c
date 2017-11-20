@@ -24,7 +24,7 @@ void error_msg(char *err_msg){
 	printf("[-] ERROR:\t %s\n", err_msg);
 	return;
 }
-
+/*
 void init_rwlocks(){
 	int retval;
 	if(pthread_rwlock_init(&client_lock, NULL) != 0){
@@ -40,7 +40,7 @@ void init_rwlocks(){
 		exit(EXIT_FAILURE);
 	}
 }
-
+*/
 void client_print(struct client_entry *client){
 	if(client){
 		printf("[+] CLIENT-INFO:\n\tusername: %s\n", client->username);
@@ -394,7 +394,7 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm, s
 		return NULL;
 	}
 
-	pthread_rwlock_wrlock(&channel_lock);
+	//pthread_rwlock_wrlock(&channel_lock);
 	if(!chm->list_head){
 		new_channel = malloc(sizeof(struct channel_entry));
 		if(!new_channel){
@@ -431,7 +431,7 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm, s
 
 	//printf("[+] New channel (%s) created.\n", new_channel->channel_name);
 
-	pthread_rwlock_unlock(&channel_lock);
+	//pthread_rwlock_unlock(&channel_lock);
 	return new_channel;
 }
 

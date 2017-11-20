@@ -1,7 +1,10 @@
 #include "server.h"
 
-pthread_t tid[2];
+pthread_t tid[3];
 //pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t channel_lock;
+pthread_rwlock_t client_lock;
+pthread_rwlock_t node_lock;
 char init_channelname[]="Common";
 char ERR_MSG[TEXT_LEN];
 
@@ -18,6 +21,22 @@ void sig_handler(int signo){
 		//FIX: implement clean up
 		freeaddrinfo(servinfo);
 		exit(EXIT_SUCCESS);
+	}
+}
+
+void init_rwlocks(){
+	int retval;
+	if(pthread_rwlock_init(&client_lock, NULL) != 0){
+		error_msg("failed to init client mutex lock.");
+		exit(EXIT_FAILURE);
+	}
+	if(pthread_rwlock_init(&channel_lock, NULL) != 0){
+		error_msg("failed to init channel mutex lock.");
+		exit(EXIT_FAILURE);
+	}
+	if(pthread_rwlock_init(&node_lock, NULL) != 0){
+		error_msg("failed to init node mutex lock.");
+		exit(EXIT_FAILURE);
 	}
 }
 

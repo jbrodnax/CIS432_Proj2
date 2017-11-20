@@ -2,7 +2,7 @@
 #include "raw.h"
 
 #define STDIN 0
-#define CSS_TIMEOUT 60
+#define CSS_TIMEOUT 12
 
 struct _server_info{
 	int portno;
