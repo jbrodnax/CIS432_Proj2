@@ -29,6 +29,7 @@
 #define MAXCMD_LEN	8
 #define LOGMSG_LEN	256
 #define SS_TIMEOUT	120
+#define SR_TIMEOUT	60
 /*Null-byte padding size for strings originating from user data*/
 #define STR_PADD	4
 

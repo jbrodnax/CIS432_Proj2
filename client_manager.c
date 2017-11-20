@@ -12,8 +12,8 @@ char channel_err4[]="max number of clients on channel reached.";
 char channel_err5[]="channel_remove_client received null argument.";
 char channel_err6[]="no clients are in this channel.";
 
-pthread_rwlock_t channel_lock;
-pthread_rwlock_t client_lock;
+//pthread_rwlock_t channel_lock;
+//pthread_rwlock_t client_lock;
 
 void error_msg(char *err_msg){
 	if(!err_msg){
@@ -33,6 +33,10 @@ void init_rwlocks(){
 	}
 	if(pthread_rwlock_init(&channel_lock, NULL) != 0){
 		error_msg("failed to init channel mutex lock.");
+		exit(EXIT_FAILURE);
+	}
+	if(pthread_rwlock_init(&node_lock, NULL) != 0){
+		error_msg("failed to init node mutex lock.");
 		exit(EXIT_FAILURE);
 	}
 }

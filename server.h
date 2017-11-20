@@ -134,6 +134,9 @@ struct _server_manager server_manager;
 struct addrinfo hints, *servinfo, *p;
 
 pthread_mutex_t lock1;
+pthread_rwlock_t channel_lock;
+pthread_rwlock_t client_lock;
+pthread_rwlock_t node_lock;
 char *LOG_RECV;
 char *LOG_SEND;
 
@@ -171,7 +174,8 @@ unique_t generate_id(struct _S2S_say *req);
 int rtable_init(struct channel_entry *ch, struct _server_manager *svm);
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm);
 int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node);
-int channel_softstate(struct channel_entry *ch);
+int channel_softstate(struct _channel_manager *chm);
+int resubscribe(struct _channel_manager *chm, int sockfd);
 int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, int sockfd);
 int save_id(unique_t id, struct _server_manager *svm);
 int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *req, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm);

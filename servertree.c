@@ -48,10 +48,12 @@ int node_add(struct _adjacent_server *node, struct _server_manager *svm){
 		return -1;
 	}
 
+	pthread_rwlock_wrlock(&node_lock);
 	svm->tree[svm->tree_size] = node;
 	node->index = svm->tree_size;
 	svm->tree_size++;
 
+	pthread_rwlock_unlock(&node_lock);
 	return svm->tree_size;
 }
 
@@ -67,6 +69,7 @@ int node_remove(struct _adjacent_server *node, struct _server_manager *svm){
 		return -1;
 	}
 
+	pthread_rwlock_wrlock(&node_lock);
 	for(i=node->index; i < svm->tree_size; i++){
 		svm->tree[i] = svm->tree[i+1];
 		if(svm->tree[i] != NULL)
@@ -77,6 +80,7 @@ int node_remove(struct _adjacent_server *node, struct _server_manager *svm){
 	svm->tree[TREE_MAX-1] = NULL;
 	svm->tree_size--;
 
+	pthread_rwlock_unlock(&node_lock);
 	return 0;
 }
 
@@ -89,17 +93,20 @@ struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _ser
 		return NULL;
 	}
 
+	pthread_rwlock_rdlock(&node_lock);
 	for(n=0; n < TREE_MAX; n++){
 		node = svm->tree[n];
 		if(!node)
 			continue;
 		if(serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
 			if(serveraddr->sin_port == node->serveraddr->sin_port){
+				pthread_rwlock_unlock(&node_lock);
 				return node;
 			}
 		}
 	}
 
+	pthread_rwlock_unlock(&node_lock);
 	return NULL;
 }
 
@@ -137,6 +144,9 @@ int rtable_init(struct channel_entry *ch, struct _server_manager *svm){
 
 	n = 0;
 	i = 0;
+
+	pthread_rwlock_wrlock(&channel_lock);
+	pthread_rwlock_rdlock(&node_lock);
 	memset(ch->routing_table, 0, TREE_MAX);
 	memset(ch->ss_rtable, 0, TREE_MAX);
 	while(n < svm->tree_size){
@@ -152,6 +162,8 @@ int rtable_init(struct channel_entry *ch, struct _server_manager *svm){
 	}
 	ch->table_size = n;
 
+	pthread_rwlock_unlock(&node_lock);
+	pthread_rwlock_unlock(&channel_lock);
 	return 0;
 }
 
@@ -165,6 +177,9 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 	}
 
 	n=0;
+
+	pthread_rwlock_rdlock(&node_lock);
+	pthread_rwlock_wrlock(&channel_lock);
 	while(n < ch->table_size){
 		if(!(node2 = ch->routing_table[n]))
 			continue;
@@ -175,6 +190,9 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 		}
 		n++;
 	}
+
+	pthread_rwlock_unlock(&channel_lock);
+	pthread_rwlock_unlock(&node_lock);
 	return -1;
 
 	RM_NODE:
@@ -190,6 +208,9 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 		}
 		if(ch->table_size > 0)
 			ch->table_size--;
+
+		pthread_rwlock_unlock(&channel_lock);
+		pthread_rwlock_unlock(&node_lock);
 		return 0;
 	/*
 	n = 0;
@@ -231,6 +252,8 @@ int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node){
 	}
 
 	n=0;
+
+	pthread_rwlock_wrlock(&node_lock);
 	while(n < ch->table_size){
 		if(!(node2 = ch->routing_table[n]))
 			continue;
@@ -238,29 +261,45 @@ int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node){
 		if(node2->serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
 			if(node2->serveraddr->sin_port == node->serveraddr->sin_port){
 				ch->ss_rtable[n]->timestamp = time(NULL);
+				pthread_rwlock_unlock(&node_lock);
 				return 0;
 			}
 		}
 		n++;
 	}
 
+	pthread_rwlock_unlock(&node_lock);
 	return -1;
 }
 
-int channel_softstate(struct channel_entry *ch){
+int channel_softstate(struct _channel_manager *chm){
+	struct channel_entry *ch;
 	struct _adjacent_server *node;
 	time_t current_time;
 	int n, i;
 
-	if(!ch){
+	if(!chm){
 		error_msg("channel_softstate received null argument.");
 		return -1;
 	}
 
 	i=0;
 	current_time = time(NULL);
+	ch = chm->list_head;
+
+	ITR_CHS:
+		/*Iterate through all subscribbed channels*/
+		if(ch->prev && ch->next){
+			ch = ch->next;
+			goto ITR_TBL;
+		}else if(!ch->prev){
+			goto ITR_TBL;
+		}else if(!ch->next){
+			return 0;
+		}
 
 	ITR_TBL:
+		/*Check all timestamps of adjacent servers subscribed to this channel*/
 		while(i < ch->table_size){
 			if((current_time - ch->ss_rtable[i]->timestamp) >= SS_TIMEOUT){
 				n = i;
@@ -268,7 +307,7 @@ int channel_softstate(struct channel_entry *ch){
 			}
 			i++;
 		}
-		return 0;
+		goto ITR_CHS;
 
 	RM_NODE:
 		free(ch->ss_rtable[n]);
@@ -285,6 +324,23 @@ int channel_softstate(struct channel_entry *ch){
                         ch->table_size--;
 		goto ITR_TBL;
 
+}
+
+int resubscribe(struct _channel_manager *chm, int sockfd){
+	struct channel_entry *ch;
+
+	if(!chm){
+		error_msg("resubscribe received null chm.");
+		return -1;
+	}
+
+	ch = chm->list_head;
+	while(ch){
+		propogate_join(ch, NULL, sockfd);
+		ch = ch->next;
+	}
+
+	return 0;
 }
 
 int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, int sockfd){

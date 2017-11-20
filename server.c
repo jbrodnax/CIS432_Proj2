@@ -243,11 +243,18 @@ void *thread_responder(void *vargp){
 	}
 }
 
-void *thread_softstate(void *vargp){
+void *thread_resubscribe(void *vargp){
+	while(1){
+		sleep(SR_TIMEOUT);
+		resubscribe(&channel_manager, server_info.sockfd);
+	}
+}
 
+void *thread_softstate(void *vargp){
 	while(1){
 		sleep(SS_TIMEOUT);
 		client_softstate(&client_manager, &channel_manager);
+		channel_softstate(&channel_manager);
 	}
 }
 
@@ -348,6 +355,7 @@ int main(int argc, char *argv[]){
 			//Create response thread
 			pthread_create(&tid[0], NULL, thread_responder, NULL);
 			pthread_create(&tid[1], NULL, thread_softstate, NULL);
+			pthread_create(&tid[2], NULL, thread_resubscribe, NULL);
 			recvdata_IPv4();
 			break;
 		case AF_INET6:
