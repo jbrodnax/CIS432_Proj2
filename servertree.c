@@ -56,8 +56,8 @@ int node_add(struct _adjacent_server *node, struct _server_manager *svm){
 }
 
 int node_remove(struct _adjacent_server *node, struct _server_manager *svm){
-	/*The svm tree array is not rearranged when a node is removed
-	since node's keep track of their init index in the array*/
+	int i;
+
 	if(!node || !svm){
 		error_msg("node_remove received null argument.");
 		return -1;
@@ -66,10 +66,15 @@ int node_remove(struct _adjacent_server *node, struct _server_manager *svm){
 		error_msg("node_remove received invalid node index.");
 		return -1;
 	}
-	
+
+	for(i=node->index; i < svm->tree_size; i++){
+		svm->tree[i] = svm->tree[i+1];
+		if(svm->tree[i] != NULL)
+			svm->tree[i]->index--;
+	}
 	freeaddrinfo(node->servinfo);
 	free(node);
-	svm->tree[node->index] = NULL;
+	svm->tree[TREE_MAX-1] = NULL;
 	svm->tree_size--;
 
 	return 0;
@@ -133,12 +138,17 @@ int rtable_init(struct channel_entry *ch, struct _server_manager *svm){
 	n = 0;
 	i = 0;
 	memset(ch->routing_table, 0, TREE_MAX);
-	while(n < svm->tree_size && i < TREE_MAX){
-		if(svm->tree[i] != NULL){
-			ch->routing_table[n] = svm->tree[i];
-			n++;
+	memset(ch->ss_rtable, 0, TREE_MAX);
+	while(n < svm->tree_size){
+		ch->routing_table[n] = svm->tree[n];
+		if(!(ch->ss_rtable[n] = malloc(sizeof(struct _ss_rtable)))){
+			perror("Error in malloc");
+			exit(EXIT_FAILURE);
 		}
-		i++;
+		//memset(ch->ss_rtable[n], 0, sizeof(struct _ss_rtable));
+		ch->ss_rtable[n]->rtable_entry = svm->tree[n];
+		ch->ss_rtable[n]->timestamp = time(NULL);
+		n++;
 	}
 	ch->table_size = n;
 
@@ -154,6 +164,34 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 		return -1;
 	}
 
+	n=0;
+	while(n < ch->table_size){
+		if(!(node2 = ch->routing_table[n]))
+			continue;
+		if(node2->serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
+			if(node2->serveraddr->sin_port == node->serveraddr->sin_port){
+				goto RM_NODE;
+			}
+		}
+		n++;
+	}
+	return -1;
+
+	RM_NODE:
+		free(ch->ss_rtable[n]);
+		while(n < ch->table_size){
+			ch->routing_table[n] = ch->routing_table[n+1];
+			ch->ss_rtable[n] = ch->ss_rtable[n+1];
+			n++;
+		}
+		if(ch->table_size < TREE_MAX){
+			ch->routing_table[TREE_MAX-1] = NULL;
+			ch->ss_rtable[TREE_MAX-1] = NULL;
+		}
+		if(ch->table_size > 0)
+			ch->table_size--;
+		return 0;
+	/*
 	n = 0;
 	opt = 0;
 	while(n < TREE_MAX){
@@ -175,12 +213,78 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 
 	for(i=n; i < TREE_MAX-1; i++)
 		ch->routing_table[i] = ch->routing_table[i+1];
-	/*Since at least one entry should be open now, zero-out the */
+
 	ch->routing_table[i] = NULL;
 	if(ch->table_size > 0)
 		ch->table_size--;
 
-	return 0;
+	return 0;*/
+}
+
+int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node){
+	struct _adjacent_server *node2;
+	int n;
+
+	if(!ch || !node){
+		error_msg("node_keepalive received null argument.");
+		return -1;
+	}
+
+	n=0;
+	while(n < ch->table_size){
+		if(!(node2 = ch->routing_table[n]))
+			continue;
+
+		if(node2->serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
+			if(node2->serveraddr->sin_port == node->serveraddr->sin_port){
+				ch->ss_rtable[n]->timestamp = time(NULL);
+				return 0;
+			}
+		}
+		n++;
+	}
+
+	return -1;
+}
+
+int channel_softstate(struct channel_entry *ch){
+	struct _adjacent_server *node;
+	time_t current_time;
+	int n, i;
+
+	if(!ch){
+		error_msg("channel_softstate received null argument.");
+		return -1;
+	}
+
+	i=0;
+	current_time = time(NULL);
+
+	ITR_TBL:
+		while(i < ch->table_size){
+			if((current_time - ch->ss_rtable[i]->timestamp) >= SS_TIMEOUT){
+				n = i;
+				goto RM_NODE;
+			}
+			i++;
+		}
+		return 0;
+
+	RM_NODE:
+		free(ch->ss_rtable[n]);
+		while(n < ch->table_size){
+			ch->routing_table[n] = ch->routing_table[n+1];
+			ch->ss_rtable[n] = ch->ss_rtable[n+1];
+			n++;
+		}
+		if(ch->table_size < TREE_MAX){
+                        ch->routing_table[TREE_MAX-1] = NULL;
+                        ch->ss_rtable[TREE_MAX-1] = NULL;
+                }
+                if(ch->table_size > 0)
+                        ch->table_size--;
+		goto ITR_TBL;
+
 }
 
 int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, int sockfd){

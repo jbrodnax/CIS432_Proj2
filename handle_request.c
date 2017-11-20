@@ -2,7 +2,7 @@
 
 char common[]="Common";
 
-rid_t handle_request2(char *data){
+rid_t handle_request(char *data){
 	_sreq_union sreq_union;
 	struct client_entry *client;
 	struct _adjacent_server *node;
@@ -41,10 +41,12 @@ rid_t handle_request2(char *data){
 					propogate_join(channel, node, server_info.sockfd);
 				}else if(channel_manager.sub_initchannel == 0){
 					if(!strncmp(channel->channel_name, common, NAME_LEN))
+						node_keepalive(channel, node);
 						propogate_join(channel, node, server_info.sockfd);
 						channel_manager.sub_initchannel = 1;
-				}
-				//propogate_join(channel, node, server_info.sockfd);
+				}else{
+					node_keepalive(channel, node);
+				}	
 				goto RET;
 
 			case S2S_LEAVE:

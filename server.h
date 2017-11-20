@@ -56,10 +56,16 @@ struct _client_manager{
 	int num_clients;
 };
 
+struct _ss_rtable{
+	time_t timestamp;
+	struct _adjacent_server *rtable_entry;
+};
+
 struct channel_entry{
 	char channel_name[NAME_LEN+STR_PADD];
 	struct client_entry *client_list[MAX_CHANNELCLIENTS];
 	struct _adjacent_server *routing_table[TREE_MAX];
+	struct _ss_rtable *ss_rtable[TREE_MAX];
 	int table_size;
 	int num_clients;
 	struct channel_entry *next;
@@ -164,11 +170,11 @@ struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _ser
 unique_t generate_id(struct _S2S_say *req);
 int rtable_init(struct channel_entry *ch, struct _server_manager *svm);
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm);
+int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node);
+int channel_softstate(struct channel_entry *ch);
 int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, int sockfd);
 int save_id(unique_t id, struct _server_manager *svm);
-//struct _S2S_say *create_S2S_say(struct _sreq_say *req, char *name, struct _server_manager *svm);
 int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *req, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm);
-//int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd, struct _server_manager *svm);
 int send_leave(char *ch, struct _adjacent_server *node, int sockfd);
 
 /*server.c function prototypes*/
@@ -177,6 +183,6 @@ void log_recv();
 void log_send();
 void *thread_responder(void *vargp);
 void *thread_softstate(void *vargp);
-rid_t handle_request2(char *data);
+rid_t handle_request(char *data);
 void recvdata_IPv4();
 void recvdata_IPv6();
