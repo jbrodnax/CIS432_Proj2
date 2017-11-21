@@ -69,7 +69,9 @@ rid_t handle_request(char *data){
 				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Say %s %s %s", node->ipaddr, node->port_str, s2s_username, sreq_union.sreq_say.channel, sreq_union.sreq_say.text);
 				log_recv();
 				if(save_id(id, &server_manager) > 0){
+					channel = channel_search(sreq_union.sreq_say.channel, &channel_manager);
 					send_leave(sreq_union.sreq_say.channel, node, server_info.sockfd);
+					rtable_prune(channel, node, &server_manager);
 					goto RET;
 				}
 				if(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)){
