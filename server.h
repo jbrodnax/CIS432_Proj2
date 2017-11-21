@@ -170,6 +170,7 @@ struct _adjacent_server *node_create(char *hostname, char *port, struct _server_
 int node_add(struct _adjacent_server *node, struct _server_manager *svm);
 int node_remove(struct _adjacent_server *node, struct _server_manager *svm);
 struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _server_manager *svm);
+int node_compare(struct _adjacent_server *node1, struct _adjacent_server *node2);
 unique_t generate_id(struct _S2S_say *req);
 int rtable_init(struct channel_entry *ch, struct _server_manager *svm);
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm);

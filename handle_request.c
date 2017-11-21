@@ -74,6 +74,16 @@ rid_t handle_request(char *data){
 					goto RET;
 				}
 				if(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)){
+					//snprintf(LOG_RECV, LOGMSG_LEN, "Channel %s has %d clients and %d table_size.", channel->channel_name, channel->num_clients, channel->table_size);
+					//log_recv();
+					/*Remove this server from the channel tree if the message can't be forwarded*/
+					if(channel->num_clients < 1 && channel->table_size == 1){
+						if(node_compare(node, channel->routing_table[0]) == 0){
+							channel_remove(channel, &channel_manager);
+							send_leave(sreq_union.sreq_say.channel, node, server_info.sockfd);
+							goto RET;
+						}
+					}
 					propogate_say(channel, s2s_username, id, &sreq_union.sreq_say, node, server_info.sockfd, NULL);
 					if(!(req_say = malloc(sizeof(struct _req_say))))
 						goto MEM_ERR;
@@ -181,8 +191,8 @@ rid_t handle_request(char *data){
 					goto CHDNE;
 				client_remove_channel(channel, client);
 				channel_remove_client(client, channel);
-				if(channel->num_clients < 1)
-					channel_remove(channel, &channel_manager);
+				//if(channel->num_clients < 1)
+				//	channel_remove(channel, &channel_manager);
 				goto RET;
 
 			case REQ_SAY:

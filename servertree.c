@@ -110,6 +110,20 @@ struct _adjacent_server *node_search(struct sockaddr_in *serveraddr, struct _ser
 	return NULL;
 }
 
+int node_compare(struct _adjacent_server *node1, struct _adjacent_server *node2){
+
+	if(!node1 || !node2)	
+		return -1;
+
+	if(node1->serveraddr->sin_addr.s_addr == node2->serveraddr->sin_addr.s_addr){
+		if(node1->serveraddr->sin_port == node2->serveraddr->sin_port){
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
 unique_t generate_id(struct _S2S_say *req){
 	unique_t id;
 	FILE *fp;
@@ -177,12 +191,9 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 	}
 
 	n=0;
-
-	//pthread_rwlock_rdlock(&node_lock);
 	pthread_rwlock_wrlock(&channel_lock);
 	while(n < ch->table_size){
-		if(!(node2 = ch->routing_table[n]))
-			continue;
+		node2 = ch->routing_table[n];
 		if(node2->serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
 			if(node2->serveraddr->sin_port == node->serveraddr->sin_port){
 				goto RM_NODE;
@@ -192,7 +203,6 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 	}
 
 	pthread_rwlock_unlock(&channel_lock);
-	//pthread_rwlock_unlock(&node_lock);
 	return -1;
 
 	RM_NODE:
@@ -209,37 +219,8 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 		if(ch->table_size > 0)
 			ch->table_size--;
 
-		pthread_rwlock_unlock(&channel_lock);
-		//pthread_rwlock_unlock(&node_lock);
+		pthread_rwlock_unlock(&channel_lock);	
 		return 0;
-	/*
-	n = 0;
-	opt = 0;
-	while(n < TREE_MAX){
-		node2 = ch->routing_table[n];
-		if(node2 == NULL){
-			n++;
-			continue;
-		}
-		if(node2->serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
-			if(node2->serveraddr->sin_port == node->serveraddr->sin_port){
-				opt = 1;
-				break;
-			}
-		}
-		n++;
-	}
-	if(opt == 0)
-		return -1;
-
-	for(i=n; i < TREE_MAX-1; i++)
-		ch->routing_table[i] = ch->routing_table[i+1];
-
-	ch->routing_table[i] = NULL;
-	if(ch->table_size > 0)
-		ch->table_size--;
-
-	return 0;*/
 }
 
 int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node){
@@ -427,29 +408,6 @@ int save_id(unique_t id, struct _server_manager *svm){
 	return retval;
 }
 
-/*struct _S2S_say *create_S2S_say(_sreq_say *req, char *name, struct _server_manager *svm){
-	struct _S2S_say *rsp;
-
-	if(!req || !name){
-		error_msg("create_s2s_say received null argument.");
-		return NULL;
-	}
-	if(!(rsp = malloc(sizeof(struct _S2S_say)))){
-		perror("Error in malloc");
-		exit(EXIT_FAILURE);
-	}
-	memset(rsp, 0, sizeof(struct _S2S_say));
-	rsp->type_id = S2S_SAY;
-	memcpy(rsp->username, name, NAME_LEN);
-	memcpy(rsp->channel, req->channel, NAME_LEN);
-	memcpy(rsp->text, req->text, TEXT_LEN);
-	if(save_id(generate_id(rsp), svm) > 0){
-		error_msg("generated say request with non-unique id.");
-	}
-
-	return rsp;
-}*/
-
 int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *req, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm){
 	struct _adjacent_server *node;
 	struct _S2S_say *rsp;
@@ -520,46 +478,8 @@ int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *
 		free(rsp);
 		return n;
 }
-/*
-int propogate_say(struct channel_entry *ch, struct _S2S_say *req, int sockfd, struct _server_manager *svm){
-	struct _adjacent_server *node;
-	int n, i;
 
-	if(!req){
-		error_msg("prop_say received null argument.");
-		return -1;
-	}
-
-	if(ch == NULL && svm != NULL){
-		for(n=0; n < TREE_MAX; n++){
-			node = svm->tree[n];
-			if(!node)
-				continue;
-			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s", node->ipaddr, node->port_str, req->username, req->channel, req->text);
-			log_send();
-			i = sendto(sockfd, req, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
-			if(i < 0)
-				perror("Error in sendto");
-		}
-		return n;
-	}
-
-	for(n=0; n < ch->table_size; n++){
-		node = ch->routing_table[n];
-		if(!node)
-			continue;	
-		snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s", node->ipaddr, node->port_str, req->username, req->channel, req->text);
-		log_send();
-		i = sendto(sockfd, req, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
-		if(i < 0)
-			perror("Error in sendto");
-	}
-
-	return n;
-}
-*/
 int send_leave(char *ch, struct _adjacent_server *node, int sockfd){
-	//struct _adjacent_server *node;
 	struct _S2S_leave req;
 	int n, i;
 
