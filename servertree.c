@@ -267,8 +267,10 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 			n++;
 		}
 		if(ch->table_size < TREE_MAX){
-			ch->routing_table[TREE_MAX-1] = NULL;
-			ch->ss_rtable[TREE_MAX-1] = NULL;
+			memset(&ch->routing_table[n], 0, (TREE_MAX-n)*sizeof(struct _adjacent_server*));
+			memset(&ch->ss_rtable[n], 0, (TREE_MAX-n)*sizeof(struct _ss_rtable *));
+			//ch->routing_table[TREE_MAX-1] = NULL;
+			//ch->ss_rtable[TREE_MAX-1] = NULL;
 		}
 		if(ch->table_size > 0)
 			ch->table_size--;
