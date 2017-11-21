@@ -181,6 +181,45 @@ int rtable_init(struct channel_entry *ch, struct _server_manager *svm){
 	return 0;
 }
 
+int rtable_search(struct channel_entry *ch, struct _adjacent_server *node){
+	int n;
+
+	if(!ch || !node)
+		return -1;
+	n=0;
+	while(n < ch->table_size){
+		if(node_compare(node, ch->routing_table[n]) == 0)
+			return 0;
+		n++;
+	}
+	
+	return -1;
+}
+
+int rtable_add(struct channel_entry *ch, struct _adjacent_server *node){
+	struct _ss_rtable *rt;
+
+	if(!ch || !node)
+		return -1;
+
+	if(ch->table_size >= TREE_MAX-1)
+		return -1;
+	if(!(rt = malloc(sizeof(struct _ss_rtable)))){
+		perror("Error in malloc");
+		exit(EXIT_FAILURE);
+	}
+	rt->rtable_entry = node;
+	rt->timestamp = time(NULL);
+
+	pthread_rwlock_wrlock(&channel_lock);
+	ch->routing_table[ch->table_size] = node;
+	ch->ss_rtable[ch->table_size] = rt;
+	ch->table_size++;
+
+	pthread_rwlock_unlock(&channel_lock);
+	return 0;
+}
+
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm){
 	struct _adjacent_server *node2;
 	int n, opt, i;

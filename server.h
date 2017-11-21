@@ -76,7 +76,7 @@ struct _channel_manager{
 	struct channel_entry *list_head;
 	struct channel_entry *list_tail;
 	int num_channels;
-	uint32_t sub_initchannel;
+	//uint32_t sub_initchannel;
 };
 
 struct _server_info{
@@ -174,6 +174,8 @@ int node_compare(struct _adjacent_server *node1, struct _adjacent_server *node2)
 unique_t generate_id(struct _S2S_say *req);
 int rtable_init(struct channel_entry *ch, struct _server_manager *svm);
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm);
+int rtable_search(struct channel_entry *ch, struct _adjacent_server *node);
+int rtable_add(struct channel_entry *ch, struct _adjacent_server *node);
 int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node);
 int channel_softstate(struct _channel_manager *chm);
 int resubscribe(struct _channel_manager *chm, int sockfd);

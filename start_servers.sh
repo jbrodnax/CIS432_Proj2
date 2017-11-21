@@ -7,13 +7,13 @@ SERVER=~/Documents/UO_Classes/CIS432/Proj2_Repo/server
 SERVER_NAME=`echo $SERVER | sed 's#.*/\(.*\)#\1#g'`
 
 # Generate a simple two-server topology
-#$SERVER localhost 4000 localhost 4001 &
-#$SERVER localhost 4001 localhost 4000 & 
+$SERVER localhost 4000 localhost 4001 &
+$SERVER localhost 4001 localhost 4000 & 
 
 # Generate a 1-2-1 server topology
-$SERVER localhost 4000 localhost 4001 &
-$SERVER localhost 4001 localhost 4000 localhost 4002 &
-$SERVER localhost 4002 localhost 4001 &
+#$SERVER localhost 4000 localhost 4001 &
+#$SERVER localhost 4001 localhost 4000 localhost 4002 &
+#$SERVER localhost 4002 localhost 4001 &
 
 # Generate a triangle topology
 #$SERVER localhost 4000 localhost 4001 localhost 4002 &

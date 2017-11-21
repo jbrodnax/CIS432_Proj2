@@ -269,16 +269,19 @@ int client_remove(struct client_entry *client, struct _client_manager *clm){
 	}else if(client->prev){
 		clm->list_tail = client->prev;
 		client->prev->next = NULL;
+	}else{
+		clm->list_head = NULL;
+		clm->list_tail = NULL;
 	}
 	if(clm->num_clients > 0)
 		clm->num_clients--;
-	/*Clean up list head/tail if they should be*/
+	/*Clean up list head/tail if they should be
 	if(clm->num_clients < 1){
 		if(clm->list_head || clm->list_tail){
 			clm->list_head = NULL;
 			clm->list_tail = NULL;
 		}
-	}
+	}*/
 	//puts("[+] Unlinked client:");
 	//client_print(client);
 
@@ -307,9 +310,9 @@ int client_logout(struct client_entry *client, struct _client_manager *clm, stru
 		ch = channel_list[0];
 		while(ch){
 			channel_remove_client(client, ch);
-			if(ch->num_clients < 1){
-				channel_remove(ch, chm);
-			}
+			//if(ch->num_clients < 1){
+			//	channel_remove(ch, chm);
+			//}
 			i++;
 			ch = channel_list[i];
 		}
@@ -437,7 +440,7 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm, s
 
 int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 	//struct client_entry *client;
-	char static_chname[]="Common";
+	//char static_chname[]="Common";
 
 	if(!channel){
 		error_msg(client_err3);
@@ -448,8 +451,8 @@ int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 		return -1;
 	}
 	/*If channel to be removed is 'Common', then just return w/o error*/
-	if(!strncmp(channel->channel_name, static_chname, strlen(static_chname)))
-		return 0;
+	//if(!strncmp(channel->channel_name, static_chname, strlen(static_chname)))
+	//	return 0;
 
 	pthread_rwlock_wrlock(&channel_lock);
 	/*Unlink list node and update chm head or tail if unlinking head or tail*/
@@ -462,6 +465,9 @@ int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 	}else if(channel->prev){
 		chm->list_tail = channel->prev;
 		channel->prev->next = NULL;
+	}else{
+		chm->list_head = NULL;
+		chm->list_tail = NULL;
 	}
 	if(chm->num_channels > 0)
 		chm->num_channels--;

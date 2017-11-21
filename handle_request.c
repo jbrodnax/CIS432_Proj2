@@ -1,6 +1,6 @@
 #include "server.h"
 
-char common[]="Common";
+//char common[]="Common";
 
 rid_t handle_request(char *data){
 	_sreq_union sreq_union;
@@ -39,11 +39,8 @@ rid_t handle_request(char *data){
 				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
 					channel = channel_create(sreq_union.sreq_name.name, &channel_manager, &server_manager);
 					propogate_join(channel, node, server_info.sockfd);
-				}else if(channel_manager.sub_initchannel == 0){
-					if(!strncmp(channel->channel_name, common, NAME_LEN))
-						node_keepalive(channel, node);
-						propogate_join(channel, node, server_info.sockfd);
-						channel_manager.sub_initchannel = 1;
+				}else if(rtable_search(channel, node) < 0){
+					rtable_add(channel, node);
 				}else{
 					node_keepalive(channel, node);
 				}	
@@ -74,8 +71,8 @@ rid_t handle_request(char *data){
 					goto RET;
 				}
 				if(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)){
-					//snprintf(LOG_RECV, LOGMSG_LEN, "Channel %s has %d clients and %d table_size.", channel->channel_name, channel->num_clients, channel->table_size);
-					//log_recv();
+					snprintf(LOG_RECV, LOGMSG_LEN, "Channel %s has %d clients and %d table_size.", channel->channel_name, channel->num_clients, channel->table_size);
+					log_recv();
 					/*Remove this server from the channel tree if the message can't be forwarded*/
 					if(channel->num_clients < 1 && channel->table_size == 1){
 						if(node_compare(node, channel->routing_table[0]) == 0){
@@ -173,11 +170,11 @@ rid_t handle_request(char *data){
 				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
 					channel = channel_create(sreq_union.sreq_name.name, &channel_manager, &server_manager);
 					propogate_join(channel, NULL, server_info.sockfd);
-				}else if(channel_manager.sub_initchannel == 0){
+				/*}else if(channel_manager.sub_initchannel == 0){
 					if(!strncmp(channel->channel_name, common, NAME_LEN)){
 						propogate_join(channel, NULL, server_info.sockfd);
 						channel_manager.sub_initchannel = 1;
-					}
+					}*/
 				}
 				client_add_channel(channel, client);
 				channel_add_client(client, channel);

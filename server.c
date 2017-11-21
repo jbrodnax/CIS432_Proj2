@@ -5,7 +5,7 @@ pthread_t tid[3];
 pthread_rwlock_t channel_lock;
 pthread_rwlock_t client_lock;
 pthread_rwlock_t node_lock;
-char init_channelname[]="Common";
+//char init_channelname[]="Common";
 char ERR_MSG[TEXT_LEN];
 
 time_t timestamp;
@@ -51,7 +51,7 @@ void log_send(){
 	memset(LOG_SEND, 0, LOGMSG_LEN);
 	return;
 }
-
+/*
 void test_chm(){
 	struct channel_entry *channel;
 
@@ -63,7 +63,7 @@ void test_chm(){
 	//propogate_join(channel, NULL, server_info.sockfd);
 	return;
 }
-
+*/
 void init_servertree(int argc, char *argv[]){
 	char *hostname;
 	char *port;
@@ -91,7 +91,7 @@ void init_server(){
 	int rv, optval;
 	void *ptr;
 
-	printf("Initializing DuckChat Server...\n");
+	//printf("Initializing DuckChat Server...\n");
 	/*Zero-out all global structs*/
 	memset(&client_manager, 0, sizeof(struct _client_manager));
 	memset(&channel_manager, 0, sizeof(struct _channel_manager));
@@ -312,8 +312,7 @@ void recvdata_IPv4(){
 
 	clientlen = sizeof(client_info.clientaddr);
 	inet_ntop(AF_INET, &(server_info.serveraddr->sin_addr), server_info.ipaddr_str, INET_ADDRSTRLEN);
-	printf("Server Setup Complete.\n");
-	printf("Accepting data on bound socket \t%s:%d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr->sin_port));
+	printf("Server Setup Complete.\nAccepting data on bound socket \t%s:%d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr->sin_port));
 	while(1){
 		memset(input, 0, BUFSIZE+STR_PADD);
 		memset(&client_info, 0, sizeof(struct _client_info));
@@ -368,7 +367,7 @@ int main(int argc, char *argv[]){
 	init_server();
 	init_servertree(argc, argv);
 	
-	test_chm();
+	//test_chm();
 	switch (p->ai_family){
 		case AF_INET:
 			//Create response thread
@@ -379,11 +378,11 @@ int main(int argc, char *argv[]){
 			break;
 		case AF_INET6:
 			puts("ai_family IPv6");	
-			recvdata_IPv6();
-			break;
+			//recvdata_IPv6();
+			//break;
 		default:
 			fprintf(stderr, "Error: ai_family invalid.\n");
-			exit(1);
+			exit(EXIT_FAILURE);
 	}
 
 	return 0;
