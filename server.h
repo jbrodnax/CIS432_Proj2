@@ -65,8 +65,10 @@ struct channel_entry{
 	char channel_name[NAME_LEN+STR_PADD];
 	struct client_entry *client_list[MAX_CHANNELCLIENTS];
 	struct _adjacent_server *routing_table[TREE_MAX];
+	struct _adjacent_server *removed[TREE_MAX];
 	struct _ss_rtable *ss_rtable[TREE_MAX];
 	int table_size;
+	int rm_size;
 	int num_clients;
 	struct channel_entry *next;
 	struct channel_entry *prev;

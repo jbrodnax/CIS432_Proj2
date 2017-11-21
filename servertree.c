@@ -198,19 +198,30 @@ int rtable_search(struct channel_entry *ch, struct _adjacent_server *node){
 
 int rtable_add(struct channel_entry *ch, struct _adjacent_server *node){
 	struct _ss_rtable *rt;
+	int n;
 
 	if(!ch || !node)
 		return -1;
 
 	if(ch->table_size >= TREE_MAX-1)
 		return -1;
+
+	/*n=0;
+	while(n < ch->rm_size){
+		if(node_compare(node, ch->removed[n]) == 0){
+			printf("node was removed earlier.\n");
+			return -1;
+		}
+		n++;
+	}*/
 	if(!(rt = malloc(sizeof(struct _ss_rtable)))){
 		perror("Error in malloc");
 		exit(EXIT_FAILURE);
 	}
 	rt->rtable_entry = node;
 	rt->timestamp = time(NULL);
-
+	snprintf(LOG_SEND, LOGMSG_LEN, "adding %s:%s to channel %s.", node->ipaddr, node->port_str, ch->channel_name);
+	log_send();
 	pthread_rwlock_wrlock(&channel_lock);
 	ch->routing_table[ch->table_size] = node;
 	ch->ss_rtable[ch->table_size] = rt;
@@ -246,6 +257,10 @@ int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct
 
 	RM_NODE:
 		free(ch->ss_rtable[n]);
+		snprintf(LOG_SEND, LOGMSG_LEN, "removing %s:%s from channel %s.", node2->ipaddr, node2->port_str, ch->channel_name);
+		log_send();
+		//ch->removed[ch->rm_size] = ch->routing_table[n];
+		//ch->rm_size++;
 		while(n < ch->table_size){
 			ch->routing_table[n] = ch->routing_table[n+1];
 			ch->ss_rtable[n] = ch->ss_rtable[n+1];
@@ -400,20 +415,21 @@ int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, in
 	pthread_rwlock_rdlock(&channel_lock);
 	memcpy(join->channel, ch->channel_name, NAME_LEN);
 	for(n=0; n < ch->table_size; n++){
-		if(!(node = ch->routing_table[n]))
-			continue;
+		node = ch->routing_table[n];
 		/*Don't send join request to server that sent it, if any.*/
-		if(sender){
+		if(node_compare(node, sender) != 0){
+		/*if(sender){
 			if(sender->serveraddr->sin_addr.s_addr == node->serveraddr->sin_addr.s_addr){
 				if(sender->serveraddr->sin_port == node->serveraddr->sin_port)
 					continue;
 			}
+		}*/
+			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Join %s", node->ipaddr, node->port_str, ch->channel_name);
+			log_send();
+			i = sendto(sockfd, join, sizeof(struct _S2S_join), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
+			if(i < 0)
+				perror("Error in sendto JOIN");
 		}
-		snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Join %s", node->ipaddr, node->port_str, ch->channel_name);
-		log_send();
-		i = sendto(sockfd, join, sizeof(struct _S2S_join), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
-		if(i < 0)
-			perror("Error in sendto JOIN");
 	}
 	pthread_rwlock_unlock(&channel_lock);
 	pthread_rwlock_unlock(&node_lock);

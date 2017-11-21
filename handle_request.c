@@ -51,9 +51,11 @@ rid_t handle_request(char *data){
 				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Leave %s", node->ipaddr, node->port_str, sreq_union.sreq_name.name);
 				log_recv();
 				if(channel = channel_search(sreq_union.sreq_name.name, &channel_manager)){
-					if(rtable_prune(channel, node, &server_manager) < 0){
-						printf("%s:%s\terror: Failed to prune %s's routing table\n", server_info.ipaddr_str, server_info.portno_str, channel->channel_name);
-						return REQ_INVALID;
+					if(rtable_search(channel, node) > -1){
+						if(rtable_prune(channel, node, &server_manager) < 0){
+							printf("%s:%s\terror: Failed to prune %s's routing table\n", server_info.ipaddr_str, server_info.portno_str, channel->channel_name);
+							return REQ_INVALID;
+						}
 					}
 				}
 				goto RET;
@@ -71,10 +73,10 @@ rid_t handle_request(char *data){
 					goto RET;
 				}
 				if(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)){
-					snprintf(LOG_RECV, LOGMSG_LEN, "Channel %s has %d clients and %d table_size.", channel->channel_name, channel->num_clients, channel->table_size);
-					log_recv();
+					//snprintf(LOG_RECV, LOGMSG_LEN, "Channel %s has %d clients and %d table_size.", channel->channel_name, channel->num_clients, channel->table_size);
+					//log_recv();
 					/*Remove this server from the channel tree if the message can't be forwarded*/
-					if(channel->num_clients < 1 && channel->table_size == 1){
+					if(channel->num_clients < 1 && channel->table_size < 2){
 						if(node_compare(node, channel->routing_table[0]) == 0){
 							channel_remove(channel, &channel_manager);
 							send_leave(sreq_union.sreq_say.channel, node, server_info.sockfd);

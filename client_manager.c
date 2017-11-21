@@ -471,7 +471,7 @@ int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 	}
 	if(chm->num_channels > 0)
 		chm->num_channels--;
-	//printf("[+] Channel (%s) has been removed.\n", channel->channel_name);
+	printf("[+] Channel (%s) has been removed.\n", channel->channel_name);
 	free(channel);
 
 	pthread_rwlock_unlock(&channel_lock);
