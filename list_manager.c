@@ -130,6 +130,9 @@ int channel_remove(struct _channel_sub *channel, struct _client_info *cl){
 	}else if(channel->prev){
 		cl->list_tail = channel->prev;
 		channel->prev->next = NULL;
+	}else{
+		cl->list_tail = NULL;
+		cl->list_head = NULL;
 	}
 	if(cl->num_channels > 0)
 		cl->num_channels--;

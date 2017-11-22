@@ -14,9 +14,10 @@ rid_t handle_request(char *data){
 	memset(&sreq_union, 0, sizeof(sreq_union));
 	memcpy(&type, data, sizeof(rid_t));
 
-	if(type > S2S_SAY)
+	if(type > S2S_SAY){
+		/*S2S_SAY should be the max type id. Assume invalid if greater.*/
 		return REQ_INVALID;
-	if(type > REQ_ALIVE){
+	}if(type > REQ_ALIVE){
 		goto S2S;
 	}
 	if(type < S2S_JOIN){
@@ -24,6 +25,7 @@ rid_t handle_request(char *data){
 	}
 
 	S2S:
+		/*S2S Label handles all messages of type S2S*/
 		if(!(node = node_search(&client_info.clientaddr, &server_manager))){
 			if(client_search(&client_info.clientaddr, &client_manager))
 				send_error("Invalid request type.", &client_info.clientaddr, server_info.sockfd);
@@ -64,7 +66,7 @@ rid_t handle_request(char *data){
 				memcpy(s2s_username, &data[(sizeof(rid_t)+sizeof(unique_t))], NAME_LEN);
 				memcpy(sreq_union.sreq_say.channel, &data[(sizeof(rid_t)+sizeof(unique_t)+NAME_LEN)], NAME_LEN);
 				memcpy(sreq_union.sreq_say.text, &data[(sizeof(rid_t)+sizeof(unique_t)+NAME_LEN+NAME_LEN)], TEXT_LEN);
-				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Say %s %s %s", node->ipaddr, node->port_str, s2s_username, sreq_union.sreq_say.channel, sreq_union.sreq_say.text);
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Say %s %s '%s'", node->ipaddr, node->port_str, s2s_username, sreq_union.sreq_say.channel, sreq_union.sreq_say.text);
 				log_recv();
 				if(save_id(id, &server_manager) > 0){
 					channel = channel_search(sreq_union.sreq_say.channel, &channel_manager);
@@ -109,6 +111,7 @@ rid_t handle_request(char *data){
 		}
 
 	USR:
+		/*USR Label handles all non-S2S message types*/
 		client = client_search(&client_info.clientaddr, &client_manager);
 		if(client){
 			client_keepalive(client);
@@ -188,7 +191,7 @@ rid_t handle_request(char *data){
 			case REQ_SAY:
 				memcpy(&sreq_union.sreq_say, data, (sizeof(rid_t)+NAME_LEN));
 				memcpy(&sreq_union.sreq_say.text, &data[(sizeof(rid_t)+NAME_LEN)], TEXT_LEN);	
-				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Say %s %s", client_info.ipaddr_str, client_info.portno_str, sreq_union.sreq_say.channel, sreq_union.sreq_say.text);
+				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Say %s '%s'", client_info.ipaddr_str, client_info.portno_str, sreq_union.sreq_say.channel, sreq_union.sreq_say.text);
 				log_recv();
 				if(!(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)))
 					goto CHDNE;

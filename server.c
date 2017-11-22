@@ -1,11 +1,11 @@
 #include "server.h"
 
 pthread_t tid[3];
-pthread_rwlock_t channel_lock;
-pthread_rwlock_t client_lock;
-pthread_rwlock_t node_lock;
+//pthread_rwlock_t channel_lock;
+//pthread_rwlock_t client_lock;
+//pthread_rwlock_t node_lock;
 char ERR_MSG[TEXT_LEN];
-time_t timestamp;
+//time_t timestamp;
 
 void error(char *msg){
 	perror(msg);
@@ -37,6 +37,11 @@ void init_rwlocks(){
 	}
 }
 
+void log_thread(char *message){
+	printf("%s:%s\t%s\n", server_info.ipaddr_str, server_info.portno_str, message);
+	return;
+}
+
 void log_recv(){
 	printf("%s:%s\t%s\n", server_info.ipaddr_str, server_info.portno_str, LOG_RECV);
 	memset(LOG_RECV, 0, LOGMSG_LEN);
@@ -62,7 +67,7 @@ void init_servertree(int argc, char *argv[]){
 			port = argv[n+1];
 			node = node_create(hostname, port, &server_manager);
 			if(node){
-				printf("Adjacent server node on bound socket \t%s:%d\n", node->ipaddr, ntohs(node->serveraddr->sin_port));
+				//printf("Adjacent server node on bound socket \t%s:%d\n", node->ipaddr, ntohs(node->serveraddr->sin_port));
 				node_add(node, &server_manager);
 			}else{
 				fprintf(stderr, "[!] Failed to create node for '%s:%s'\n", hostname, port);
@@ -224,12 +229,10 @@ void send_data(struct _queue_entry *entry, int sockfd){
 
 void *thread_responder(void *vargp){
 	int t_sockfd, i;
-	time_t current_time;
-	time_t timestamp;
 	struct _req_queue thread_queue;	
 
 	t_sockfd = server_info.sockfd;
-	timestamp = time(NULL);
+	//timestamp = time(NULL);
 	while(1){
 		memset(&thread_queue, 0, sizeof(struct _req_queue));
 		request_dequeue(&thread_queue);

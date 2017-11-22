@@ -159,7 +159,7 @@ int rtable_init(struct channel_entry *ch, struct _server_manager *svm){
 	n = 0;
 	i = 0;
 
-	pthread_rwlock_wrlock(&channel_lock);
+	/*rtable_init is only called by channel_create which has already locked the channel lock*/
 	pthread_rwlock_rdlock(&node_lock);
 	memset(ch->routing_table, 0, TREE_MAX);
 	memset(ch->ss_rtable, 0, TREE_MAX);
@@ -168,17 +168,14 @@ int rtable_init(struct channel_entry *ch, struct _server_manager *svm){
 		if(!(ch->ss_rtable[n] = malloc(sizeof(struct _ss_rtable)))){
 			perror("Error in malloc");
 			exit(EXIT_FAILURE);
-		}
-		//memset(ch->ss_rtable[n], 0, sizeof(struct _ss_rtable));
+		}	
 		ch->ss_rtable[n]->rtable_entry = svm->tree[n];
 		ch->ss_rtable[n]->timestamp = time(NULL);
 		n++;
 	}
 	ch->table_size = n;
-	snprintf(LOG_SEND, LOGMSG_LEN, "Channel %s init with table_size %d.", ch->channel_name, ch->table_size);
-	log_send();
+
 	pthread_rwlock_unlock(&node_lock);
-	pthread_rwlock_unlock(&channel_lock);
 	return 0;
 }
 
@@ -278,8 +275,8 @@ int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node){
 	}
 
 	n=0;
-	snprintf(LOG_RECV, LOGMSG_LEN, "S2S Join was a keepalive.");
-	log_recv();
+	//snprintf(LOG_RECV, LOGMSG_LEN, "S2S Join was a keepalive.");
+	//log_recv();
 	pthread_rwlock_rdlock(&node_lock);
 	pthread_rwlock_rdlock(&channel_lock);
 	while(n < ch->table_size){
@@ -303,6 +300,7 @@ int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node){
 }
 
 int channel_softstate(struct _channel_manager *chm){
+	char log_msg[LOGMSG_LEN];
 	struct channel_entry *ch;
 	struct _adjacent_server *node;
 	time_t current_time;
@@ -335,8 +333,8 @@ int channel_softstate(struct _channel_manager *chm){
 		while(i < ch->table_size){
 			if((current_time - ch->ss_rtable[i]->timestamp) >= SS_TIMEOUT){
 				n = i;
-				snprintf(LOG_SEND, LOGMSG_LEN, "channel %s timeout from %s:%s.", ch->channel_name, ch->routing_table[n]->ipaddr, ch->routing_table[n]->port_str);
-				log_send();
+				snprintf(log_msg, LOGMSG_LEN, "channel %s timeout from %s:%s.", ch->channel_name, ch->routing_table[n]->ipaddr, ch->routing_table[n]->port_str);
+				log_thread(log_msg);
 				pthread_rwlock_unlock(&channel_lock);
 				goto RM_NODE;
 			}
@@ -367,6 +365,7 @@ int channel_softstate(struct _channel_manager *chm){
 }
 
 int resubscribe(struct _channel_manager *chm, int sockfd){
+	char log_msg[LOGMSG_LEN];
 	struct _adjacent_server *node;
 	struct channel_entry *ch;
 	struct _S2S_join *join;
@@ -388,14 +387,14 @@ int resubscribe(struct _channel_manager *chm, int sockfd){
 	pthread_rwlock_rdlock(&channel_lock);
 	ch = chm->list_head;
 	while(ch){
-		memcpy(join->channel, ch->channel_name, NAME_LEN);
+		memcpy(join->channel, ch->channel_name, NAME_LEN);	
 		for(n=0;n<ch->table_size;n++){
-			node = ch->routing_table[n];
-			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Join %s (resubscription)", node->ipaddr, node->port_str, ch->channel_name);
-			log_send();
+			node = ch->routing_table[n];	
+			snprintf(log_msg, LOGMSG_LEN, "%s:%s\tsend S2S Join %s (resubscription)", node->ipaddr, node->port_str, ch->channel_name);
+			log_thread(log_msg);
 			if(sendto(sockfd, join, sizeof(struct _S2S_join), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr)) < 0)
 				perror("Error in sendto (resubscription)");
-		}
+		}	
 		ch = ch->next;
 	}
 
@@ -405,6 +404,7 @@ int resubscribe(struct _channel_manager *chm, int sockfd){
 }
 
 int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm){
+	char log_msg[LOGMSG_LEN];
 	struct _adjacent_server *node;
 	struct _S2S_join *join;
 	int n, i;
@@ -422,20 +422,19 @@ int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, in
 	join->type_id = S2S_JOIN;
 
 	pthread_rwlock_rdlock(&node_lock);
-	pthread_rwlock_rdlock(&channel_lock);
 	memcpy(join->channel, ch->channel_name, NAME_LEN);
 	for(n=0; n < svm->tree_size; n++){
 		node = svm->tree[n];
 		/*Don't send join request to source server.*/
-		if(node_compare(node, sender) != 0){
-			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Join %s", node->ipaddr, node->port_str, ch->channel_name);
-			log_send();
+		if(node_compare(node, sender) != 0){	
+			snprintf(log_msg, LOGMSG_LEN, "%s:%s\tsend S2S Join %s", node->ipaddr, node->port_str, ch->channel_name);
+			log_thread(log_msg);	
 			i = sendto(sockfd, join, sizeof(struct _S2S_join), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
 			if(i < 0)
 				perror("Error in sendto JOIN");
 		}
 	}
-	pthread_rwlock_unlock(&channel_lock);
+
 	pthread_rwlock_unlock(&node_lock);
 	free(join);
 	return n;
@@ -466,6 +465,7 @@ int save_id(unique_t id, struct _server_manager *svm){
 }
 
 int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *req, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm){
+	char log_msg[LOGMSG_LEN];
 	struct _adjacent_server *node;
 	struct _S2S_say *rsp;
 	int n, i;
@@ -501,12 +501,13 @@ int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *
 		for(n=0;n<ch->table_size;n++){
 			node = ch->routing_table[n];
 			if(node){
-				snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s %llu", node->ipaddr, node->port_str, name, req->channel, req->text, rsp->msg_id);
-				log_send();
+				snprintf(log_msg, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s '%s'", node->ipaddr, node->port_str, name, req->channel, req->text);
+				log_thread(log_msg);
 				if(sendto(sockfd, rsp, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr)) < 0)
 					perror("Error in sendto");
 			}
 		}
+
 		pthread_rwlock_unlock(&channel_lock);
 		free(rsp);
 		return n;
@@ -514,7 +515,7 @@ int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *
 	RELAY:
 		/*Relays an S2S Say to other servers on channel except for the source server*/
 		rsp->msg_id = id;
-		pthread_rwlock_rdlock(&channel_lock);
+		pthread_rwlock_rdlock(&channel_lock);	
 		for(n=0;n<ch->table_size;n++){
 			if(!(node = ch->routing_table[n]))
 				continue;
@@ -522,17 +523,19 @@ int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *
 					if(sender->serveraddr->sin_port == node->serveraddr->sin_port)
 						continue;
 			}
-			snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s %s %llu", node->ipaddr, node->port_str, name, req->channel, req->text, id);
-			log_send();
+			snprintf(log_msg, LOGMSG_LEN, "%s:%s\tsend S2S Say %s %s '%s'", node->ipaddr, node->port_str, name, req->channel, req->text);
+			log_thread(log_msg);
 			if(sendto(sockfd, rsp, sizeof(struct _S2S_say), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr)) < 0)
 				perror("Error in sendto");
 		}
+
 		pthread_rwlock_unlock(&channel_lock);
 		free(rsp);
 		return n;
 }
 
 int send_leave(char *ch, struct _adjacent_server *node, int sockfd){
+	char log_msg[LOGMSG_LEN];
 	struct _S2S_leave req;
 	int n, i;
 
@@ -544,8 +547,8 @@ int send_leave(char *ch, struct _adjacent_server *node, int sockfd){
 	req.type_id = S2S_LEAVE;
 	pthread_rwlock_rdlock(&node_lock);
 	memcpy(req.channel, ch, NAME_LEN);
-	snprintf(LOG_SEND, LOGMSG_LEN, "%s:%s\tsend S2S Leave %s", node->ipaddr, node->port_str, ch);
-	log_send();
+	snprintf(log_msg, LOGMSG_LEN, "%s:%s\tsend S2S Leave %s", node->ipaddr, node->port_str, ch);
+	log_thread(log_msg);
 	n = sendto(sockfd, &req, sizeof(struct _S2S_leave), 0, (struct sockaddr *)node->serveraddr, sizeof(struct sockaddr));
 	if(n < 0)
 		perror("Error in sendto");
@@ -553,16 +556,4 @@ int send_leave(char *ch, struct _adjacent_server *node, int sockfd){
 	pthread_rwlock_unlock(&node_lock);
 	return n;
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

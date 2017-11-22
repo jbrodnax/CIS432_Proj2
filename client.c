@@ -98,7 +98,7 @@ rid_t build_request(rid_t type, int argc, char *argv[]){
 			memset(&req_join, 0, output_size);
 			req_join.type_id = REQ_JOIN;
 			memcpy(req_join.channel, argv[1], NAME_LEN);
-			memcpy(output, &req_join, output_size);
+			memcpy(output, &req_join, output_size);	
 			return REQ_JOIN;
 		case REQ_LEAVE:
 			output_size = sizeof(struct _req_leave);
@@ -174,6 +174,10 @@ rid_t resolve_cmd(int argc, char *argv[]){
 		memcpy(channel_name, argv[1], NAME_LEN);
 		if((ch = channel_search(channel_name, &client_info)) == NULL)
 			return RET_FAILURE;
+		if(!strncmp(ch->channel_name, client_info.active_channel->channel_name, NAME_LEN)){
+			printf("[-] Error: cannot leave active channel. Please switch first.\n");
+			return RET_FAILURE;
+		}
 		if(build_request(REQ_LEAVE, 1, argv) == REQ_LEAVE){
 			if(send_data() > -1){
 				channel_remove(ch, &client_info);
@@ -327,6 +331,7 @@ void sanitize_input(char *input, int n){
 }
 
 void handle_user_input(char *input, int n){
+/*Isn't this function beautiful?...*/
 	char *argv[2];
 	char cmd_name[MAXCMD_LEN+STR_PADD];
 	char cmd_arg1[NAME_LEN+STR_PADD];
@@ -371,15 +376,16 @@ void handle_user_input(char *input, int n){
 			}
 		}else if(input[i] == 0x20){
 			i++;
+			memset(cmd_arg1, 0, NAME_LEN+STR_PADD);
 			/*Get strlen of command arg*/
-			j = strlen(&input[i]);
+			j = strlen(&input[i]);	
 			if(j > NAME_LEN || j < 1){
 				printf("[-] Invalid command argument\n");
 				return;
 			}
 			strncpy(cmd_arg1, &input[i], j);
 			argv[0] = cmd_name;
-			argv[1] = cmd_arg1;	
+			argv[1] = cmd_arg1;
 			if(resolve_cmd(2, argv) == RET_FAILURE)
 				printf("[-] Command failure!\n");
 			return;

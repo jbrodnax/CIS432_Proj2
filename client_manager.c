@@ -12,39 +12,14 @@ char channel_err4[]="max number of clients on channel reached.";
 char channel_err5[]="channel_remove_client received null argument.";
 char channel_err6[]="no clients are in this channel.";
 
-//pthread_rwlock_t channel_lock;
-//pthread_rwlock_t client_lock;
-
 void error_msg(char *err_msg){
 	if(!err_msg){
 		perror("[-] ERROR:\t ");
 		return;
 	}
 
-	printf("[-] ERROR:\t %s\n", err_msg);
+	printf("[-] ERROR:\t%s\n", err_msg);
 	return;
-}
-/*
-void init_rwlocks(){
-	int retval;
-	if(pthread_rwlock_init(&client_lock, NULL) != 0){
-		error_msg("failed to init client mutex lock.");
-		exit(EXIT_FAILURE);
-	}
-	if(pthread_rwlock_init(&channel_lock, NULL) != 0){
-		error_msg("failed to init channel mutex lock.");
-		exit(EXIT_FAILURE);
-	}
-	if(pthread_rwlock_init(&node_lock, NULL) != 0){
-		error_msg("failed to init node mutex lock.");
-		exit(EXIT_FAILURE);
-	}
-}
-*/
-void client_print(struct client_entry *client){
-	if(client){
-		printf("[+] CLIENT-INFO:\n\tusername: %s\n", client->username);
-	}
 }
 
 struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _client_manager *clm){
@@ -156,6 +131,7 @@ struct client_entry *client_list_tail(struct _client_manager *clm){
 int client_softstate(struct _client_manager *clm, struct _channel_manager *chm){
 	struct client_entry *client;	
 	time_t current_time;
+	char log_msg[LOGMSG_LEN];
 
 	if(!clm || !chm){
 		error_msg("client_softstate received null argument.");
@@ -168,7 +144,8 @@ int client_softstate(struct _client_manager *clm, struct _channel_manager *chm){
 	while(client){
 		if((current_time - client->timestamp) >= SS_TIMEOUT){
 			pthread_rwlock_unlock(&client_lock);
-			printf("timeout from client %s\n", client->username);
+			snprintf(log_msg, LOGMSG_LEN, "client %s timed-out\n", client->username);
+			log_thread(log_msg);
 			client_logout(client, clm, chm);
 			pthread_rwlock_rdlock(&client_lock);
 		}
@@ -240,8 +217,6 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 	/*Update list tail and number of clients*/
 	clm->list_tail = new_client;
 	clm->num_clients++;
-	//puts("[+] New client added");
-	//client_print(new_client);
 
 	pthread_rwlock_unlock(&client_lock);
 	return new_client;	
@@ -275,15 +250,6 @@ int client_remove(struct client_entry *client, struct _client_manager *clm){
 	}
 	if(clm->num_clients > 0)
 		clm->num_clients--;
-	/*Clean up list head/tail if they should be
-	if(clm->num_clients < 1){
-		if(clm->list_head || clm->list_tail){
-			clm->list_head = NULL;
-			clm->list_tail = NULL;
-		}
-	}*/
-	//puts("[+] Unlinked client:");
-	//client_print(client);
 
 	free(client);
 
@@ -310,9 +276,6 @@ int client_logout(struct client_entry *client, struct _client_manager *clm, stru
 		ch = channel_list[0];
 		while(ch){
 			channel_remove_client(client, ch);
-			//if(ch->num_clients < 1){
-			//	channel_remove(ch, chm);
-			//}
 			i++;
 			ch = channel_list[i];
 		}
@@ -332,11 +295,7 @@ void client_clean(struct _client_manager *clm){
 	while(1){
 		if(!clm->list_head || clm->num_clients < 1)
 			break;
-
 		client = clm->list_head;
-		//if(client->hostp)
-		//	free(client->hostp);
-
 		clm->list_head = client->next;	
 		free(client);
 		clm->num_clients--;
@@ -387,8 +346,8 @@ struct channel_entry *channel_list_tail(struct _channel_manager *chm){
 
 struct channel_entry *channel_create(char *name, struct _channel_manager *chm, struct _server_manager *svm){
 /*
-* Allocate new client_entry, fill with client info and add it to the tail of the client list.
-* Inits client_list if NULL;
+* Allocate new channel_entry, fill with channel info and add it to the tail of the list.
+* Inits channel_list if empty;
 */
 	struct channel_entry *new_channel;
 
@@ -397,7 +356,7 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm, s
 		return NULL;
 	}
 
-	//pthread_rwlock_wrlock(&channel_lock);
+	pthread_rwlock_wrlock(&channel_lock);
 	if(!chm->list_head){
 		new_channel = malloc(sizeof(struct channel_entry));
 		if(!new_channel){
@@ -408,10 +367,6 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm, s
 		chm->list_head = new_channel;
 		chm->list_tail = new_channel;
 	}else{
-		/*if(client_test_search(name, clm)){
-			printf("[-] Client (%s) already exists.\n", name);
-			return NULL;
-		}*/
 		new_channel = malloc(sizeof(struct channel_entry));
 		if(!new_channel){
 			error_msg(NULL);
@@ -434,13 +389,11 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm, s
 
 	//printf("[+] New channel (%s) created.\n", new_channel->channel_name);
 
-	//pthread_rwlock_unlock(&channel_lock);
+	pthread_rwlock_unlock(&channel_lock);
 	return new_channel;
 }
 
 int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
-	//struct client_entry *client;
-	//char static_chname[]="Common";
 
 	if(!channel){
 		error_msg(client_err3);
@@ -450,9 +403,6 @@ int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 		error_msg(client_err4);
 		return -1;
 	}
-	/*If channel to be removed is 'Common', then just return w/o error*/
-	//if(!strncmp(channel->channel_name, static_chname, strlen(static_chname)))
-	//	return 0;
 
 	pthread_rwlock_wrlock(&channel_lock);
 	/*Unlink list node and update chm head or tail if unlinking head or tail*/
@@ -471,7 +421,7 @@ int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 	}
 	if(chm->num_channels > 0)
 		chm->num_channels--;
-	printf("[+] Channel (%s) has been removed.\n", channel->channel_name);
+	//printf("[+] Channel (%s) has been removed.\n", channel->channel_name);
 	free(channel);
 
 	pthread_rwlock_unlock(&channel_lock);

@@ -135,7 +135,7 @@ struct _client_info client_info;
 struct _server_manager server_manager;
 struct addrinfo hints, *servinfo, *p;
 
-pthread_mutex_t lock1;
+pthread_mutex_t lock1; //lock_send, lock_recv;
 pthread_rwlock_t channel_lock;
 pthread_rwlock_t client_lock;
 pthread_rwlock_t node_lock;
@@ -188,6 +188,7 @@ int send_leave(char *ch, struct _adjacent_server *node, int sockfd);
 
 /*server.c function prototypes*/
 int send_error(char *errmsg, struct sockaddr_in *clientaddr, int sockfd);
+void log_thread(char *message);
 void log_recv();
 void log_send();
 void *thread_responder(void *vargp);
