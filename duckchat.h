@@ -28,11 +28,16 @@
 #define MAXQSIZE	128
 #define MAXCMD_LEN	8
 #define LOGMSG_LEN	256
+/*
+* Server timeouts (seconds). SS_TIMEOUT defines timeout for connected clients and 
+* subscribed servers and SR_TIMEOUT defines time for resubscribing to adjacent server channels.
+* CSS_TIMEOUT defines time for client-side broadcasting of keepalive's.
+*/
 #define SS_TIMEOUT	120
 #define SR_TIMEOUT	60
+#define CSS_TIMEOUT	60
 /*Null-byte padding size for strings originating from user data*/
 #define STR_PADD	4
-
 /*Define request types sent from client to server*/
 #define REQ_LOGIN	0
 #define REQ_LOGOUT	1
@@ -120,6 +125,10 @@ struct __attribute__((packed)) _rsp_err {
 	char message[TEXT_LEN];
 };
 
+/*
+* The following type definitions are used by a server's handle_request
+* function to safely handle packet data that will be treated as a string.
+*/
 typedef struct __attribute__((packed)) __sreq_name {
 	rid_t type_id;
 	char name[NAME_LEN+STR_PADD];

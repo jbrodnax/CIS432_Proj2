@@ -275,8 +275,8 @@ int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node){
 	}
 
 	n=0;
-	//snprintf(LOG_RECV, LOGMSG_LEN, "S2S Join was a keepalive.");
-	//log_recv();
+	snprintf(LOG_RECV, LOGMSG_LEN, "S2S Join was a keepalive.");
+	log_recv();
 	pthread_rwlock_rdlock(&node_lock);
 	pthread_rwlock_rdlock(&channel_lock);
 	while(n < ch->table_size){
@@ -312,56 +312,36 @@ int channel_softstate(struct _channel_manager *chm){
 	}
 
 	current_time = time(NULL);
-	ch = chm->list_head;
-	goto ITR_CHS;
-	ITR_CHS:
-		/*Iterate through all subscribbed channels*/
-		i = 0;
-		if(ch->prev && ch->next){
-			ch = ch->next;
-			goto ITR_TBL;
-		}else if(!ch->prev){
-			goto ITR_TBL;
-		}else if(!ch->next){
-			pthread_rwlock_unlock(&channel_lock);	
-			return 0;
-		}
 
-	ITR_TBL:
-		/*Check all timestamps of adjacent servers subscribed to this channel*/
-		pthread_rwlock_rdlock(&channel_lock);
+	pthread_rwlock_rdlock(&channel_lock);
+	ch = chm->list_head;
+	while(ch){
+		i=0;	
 		while(i < ch->table_size){
 			if((current_time - ch->ss_rtable[i]->timestamp) >= SS_TIMEOUT){
 				n = i;
 				snprintf(log_msg, LOGMSG_LEN, "channel %s timeout from %s:%s.", ch->channel_name, ch->routing_table[n]->ipaddr, ch->routing_table[n]->port_str);
-				log_thread(log_msg);
-				pthread_rwlock_unlock(&channel_lock);
-				goto RM_NODE;
+				log_thread(log_msg);	
+				free(ch->ss_rtable[n]);
+				while(n < ch->table_size){
+					ch->routing_table[n] = ch->routing_table[n+1];
+					ch->ss_rtable[n] = ch->ss_rtable[n+1];
+					n++;
+				}
+				if(ch->table_size < TREE_MAX){
+					ch->routing_table[TREE_MAX-1] = NULL;
+					ch->ss_rtable[TREE_MAX-1] = NULL;
+				}
+				if(ch->table_size > 0)
+				        ch->table_size--;	
 			}
 			i++;
 		}
-		pthread_rwlock_unlock(&channel_lock);
-		goto ITR_CHS;
+		ch = ch->next;	
+	}
 
-	RM_NODE:
-		pthread_rwlock_rdlock(&node_lock);
-		pthread_rwlock_wrlock(&channel_lock);
-		free(ch->ss_rtable[n]);
-		while(n < ch->table_size){
-			ch->routing_table[n] = ch->routing_table[n+1];
-			ch->ss_rtable[n] = ch->ss_rtable[n+1];
-			n++;
-		}
-		if(ch->table_size < TREE_MAX){
-                        ch->routing_table[TREE_MAX-1] = NULL;
-                        ch->ss_rtable[TREE_MAX-1] = NULL;
-                }	
-                if(ch->table_size > 0)
-                        ch->table_size--;
-		pthread_rwlock_unlock(&channel_lock);
-		pthread_rwlock_unlock(&node_lock);
-		goto ITR_TBL;
-
+	pthread_rwlock_unlock(&channel_lock);
+	return 0;
 }
 
 int resubscribe(struct _channel_manager *chm, int sockfd){

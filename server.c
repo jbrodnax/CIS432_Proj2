@@ -1,11 +1,7 @@
 #include "server.h"
 
 pthread_t tid[3];
-//pthread_rwlock_t channel_lock;
-//pthread_rwlock_t client_lock;
-//pthread_rwlock_t node_lock;
 char ERR_MSG[TEXT_LEN];
-//time_t timestamp;
 
 void error(char *msg){
 	perror(msg);
@@ -66,8 +62,7 @@ void init_servertree(int argc, char *argv[]){
 			hostname = argv[n];
 			port = argv[n+1];
 			node = node_create(hostname, port, &server_manager);
-			if(node){
-				//printf("Adjacent server node on bound socket \t%s:%d\n", node->ipaddr, ntohs(node->serveraddr->sin_port));
+			if(node){	
 				node_add(node, &server_manager);
 			}else{
 				fprintf(stderr, "[!] Failed to create node for '%s:%s'\n", hostname, port);
@@ -232,7 +227,6 @@ void *thread_responder(void *vargp){
 	struct _req_queue thread_queue;	
 
 	t_sockfd = server_info.sockfd;
-	//timestamp = time(NULL);
 	while(1){
 		memset(&thread_queue, 0, sizeof(struct _req_queue));
 		request_dequeue(&thread_queue);
@@ -267,7 +261,7 @@ void recvdata_IPv4(){
 
 	clientlen = sizeof(client_info.clientaddr);
 	inet_ntop(AF_INET, &(server_info.serveraddr->sin_addr), server_info.ipaddr_str, INET_ADDRSTRLEN);
-	printf("[+] Server Setup Complete:\tAccepting data on bound socket \t%s:%d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr->sin_port));
+	printf("%s:%d\tServer Setup Complete\n", server_info.ipaddr_str, ntohs(server_info.serveraddr->sin_port));
 	while(1){
 		memset(input, 0, BUFSIZE+STR_PADD);
 		memset(&client_info, 0, sizeof(struct _client_info));
@@ -291,7 +285,7 @@ int main(int argc, char *argv[]){
 	void *ptr;
 
 	if((argc%2) != 1){
-		printf("Usage: <domain/ip> <port #> (Followed by N adjacent server <domain/ip> <port #> pairs\n");
+		printf("Usage: <domain/ip> <port #> (followed by N adjacent server <domain/ip> <port #> pairs)\n");
 		exit(0);
 	}
 
