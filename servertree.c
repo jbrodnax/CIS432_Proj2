@@ -1,9 +1,8 @@
 #include "server.h"
 
 struct _adjacent_server *node_create(char *hostname, char *port, struct _server_manager *svm){
-	struct _adjacent_server *new_node;
-	struct addrinfo *p;
-	int rv, optval;
+	struct _adjacent_server *new_node;	
+	int rv;
 
 	if(!hostname || !port || !svm){
 		error_msg("node_create received invalid argument.");
@@ -149,7 +148,7 @@ unique_t generate_id(struct _S2S_say *req){
 }
 
 int rtable_init(struct channel_entry *ch, struct _server_manager *svm){
-	int n, i;
+	int n;
 
 	if(!ch || !svm){
 		error_msg("rtable_init received null arguments.");
@@ -157,8 +156,6 @@ int rtable_init(struct channel_entry *ch, struct _server_manager *svm){
 	}
 
 	n = 0;
-	i = 0;
-
 	/*rtable_init is only called by channel_create which has already locked the channel lock*/
 	pthread_rwlock_rdlock(&node_lock);
 	memset(ch->routing_table, 0, TREE_MAX);
@@ -195,8 +192,7 @@ int rtable_search(struct channel_entry *ch, struct _adjacent_server *node){
 }
 
 int rtable_add(struct channel_entry *ch, struct _adjacent_server *node){
-	struct _ss_rtable *rt;
-	int n;
+	struct _ss_rtable *rt;	
 
 	if(!ch || !node)
 		return -1;
@@ -223,7 +219,7 @@ int rtable_add(struct channel_entry *ch, struct _adjacent_server *node){
 
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm){
 	struct _adjacent_server *node2;
-	int n, opt, i;
+	int n;
 
 	if(!ch || !node || !svm){
 		error_msg("rtable_prune received null argument.");
@@ -275,8 +271,6 @@ int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node){
 	}
 
 	n=0;
-	snprintf(LOG_RECV, LOGMSG_LEN, "S2S Join was a keepalive.");
-	log_recv();
 	pthread_rwlock_rdlock(&node_lock);
 	pthread_rwlock_rdlock(&channel_lock);
 	while(n < ch->table_size){
@@ -301,8 +295,7 @@ int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node){
 
 int channel_softstate(struct _channel_manager *chm){
 	char log_msg[LOGMSG_LEN];
-	struct channel_entry *ch;
-	struct _adjacent_server *node;
+	struct channel_entry *ch;	
 	time_t current_time;
 	int n, i;
 
@@ -320,7 +313,7 @@ int channel_softstate(struct _channel_manager *chm){
 		while(i < ch->table_size){
 			if((current_time - ch->ss_rtable[i]->timestamp) >= SS_TIMEOUT){
 				n = i;
-				snprintf(log_msg, LOGMSG_LEN, "channel %s timeout from %s:%s.", ch->channel_name, ch->routing_table[n]->ipaddr, ch->routing_table[n]->port_str);
+				snprintf(log_msg, LOGMSG_LEN, "Timeout on channel %s from %s:%s", ch->channel_name, ch->routing_table[n]->ipaddr, ch->routing_table[n]->port_str);
 				log_thread(log_msg);	
 				free(ch->ss_rtable[n]);
 				while(n < ch->table_size){
@@ -448,7 +441,7 @@ int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *
 	char log_msg[LOGMSG_LEN];
 	struct _adjacent_server *node;
 	struct _S2S_say *rsp;
-	int n, i;
+	int n;
 
 	if(!req || !ch){
 		error_msg("prop_say received null argument.");
@@ -517,7 +510,7 @@ int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *
 int send_leave(char *ch, struct _adjacent_server *node, int sockfd){
 	char log_msg[LOGMSG_LEN];
 	struct _S2S_leave req;
-	int n, i;
+	int n;
 
 	if(!ch || !node){
 		error_msg("send_leave received null argument.");

@@ -18,7 +18,6 @@ void sig_handler(int signo){
 }
 
 void init_rwlocks(){
-	int retval;
 	if(pthread_rwlock_init(&client_lock, NULL) != 0){
 		error_msg("failed to init client mutex lock.");
 		exit(EXIT_FAILURE);
@@ -74,7 +73,6 @@ void init_servertree(int argc, char *argv[]){
 
 void init_server(){
 	int rv, optval;
-	void *ptr;
 
 	/*Zero-out all global structs*/
 	memset(&client_manager, 0, sizeof(struct _client_manager));
@@ -151,8 +149,7 @@ void send_data(struct _queue_entry *entry, int sockfd){
 	struct client_entry *client;
 	struct _rsp_say rsp_say;
         struct _rsp_list rsp_list;
-        struct _rsp_who rsp_who;
-        struct _rsp_err rsp_err;
+        struct _rsp_who rsp_who; 
 
 	if(&entry->clientaddr){
 		getnameinfo((struct sockaddr*)&entry->clientaddr, sizeof(struct sockaddr), ipaddr, 128, portno, 32, NI_NUMERICHOST | NI_NUMERICSERV);
@@ -222,7 +219,7 @@ void send_data(struct _queue_entry *entry, int sockfd){
 	free(entry);
 }
 
-void *thread_responder(void *vargp){
+void *thread_responder(){
 	int t_sockfd, i;
 	struct _req_queue thread_queue;	
 
@@ -238,14 +235,14 @@ void *thread_responder(void *vargp){
 	}
 }
 
-void *thread_resubscribe(void *vargp){
+void *thread_resubscribe(){
 	while(1){
 		sleep(SR_TIMEOUT);
 		resubscribe(&channel_manager, server_info.sockfd);
 	}
 }
 
-void *thread_softstate(void *vargp){
+void *thread_softstate(){
 	while(1){
 		sleep(SS_TIMEOUT);
 		client_softstate(&client_manager, &channel_manager);
@@ -256,7 +253,6 @@ void *thread_softstate(void *vargp){
 void recvdata_IPv4(){
 	char input[BUFSIZE+STR_PADD];
 	int n;
-	rid_t type;
 	socklen_t clientlen;
 
 	clientlen = sizeof(client_info.clientaddr);
@@ -280,9 +276,7 @@ void recvdata_IPv4(){
 }
 
 int main(int argc, char *argv[]){
-	int optval, rv;
-	int n;
-	void *ptr;
+	int n;	
 
 	if((argc%2) != 1){
 		printf("Usage: <domain/ip> <port #> (followed by N adjacent server <domain/ip> <port #> pairs)\n");

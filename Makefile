@@ -1,7 +1,7 @@
 CC=gcc
 
-#CFLAGS=-Wall -W -g -Werror -pthread
-CFLAGS=-g -pthread
+CFLAGS=-Wall -W -g -Werror -pthread
+#CFLAGS=-g -pthread
 
 all: server client
 

@@ -144,9 +144,9 @@ int client_softstate(struct _client_manager *clm, struct _channel_manager *chm){
 	while(client){
 		if((current_time - client->timestamp) >= SS_TIMEOUT){
 			pthread_rwlock_unlock(&client_lock);
-			snprintf(log_msg, LOGMSG_LEN, "client %s timed-out\n", client->username);
+			snprintf(log_msg, LOGMSG_LEN, "client %s timed-out", client->username);
 			log_thread(log_msg);
-			client_logout(client, clm, chm);
+			client_logout(client, clm);
 			pthread_rwlock_rdlock(&client_lock);
 		}
 		client = client->next;
@@ -257,7 +257,7 @@ int client_remove(struct client_entry *client, struct _client_manager *clm){
 	return 0;
 }
 
-int client_logout(struct client_entry *client, struct _client_manager *clm, struct _channel_manager *chm){
+int client_logout(struct client_entry *client, struct _client_manager *clm){
 	struct channel_entry *ch;
 	struct channel_entry *channel_list[MAX_CHANNELCLIENTS];
 	int i;
@@ -470,8 +470,7 @@ int channel_add_client(struct client_entry *client, struct channel_entry *channe
 }
 
 int channel_remove_client(struct client_entry *client, struct channel_entry *channel){
-	struct client_entry *current;
-	int i;
+	struct client_entry *current;	
 	int n = 0;
 
 	if(!client || !channel){

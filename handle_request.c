@@ -5,8 +5,7 @@ rid_t handle_request(char *data){
 	struct client_entry *client;
 	struct _adjacent_server *node;
 	struct channel_entry *channel;
-	struct _queue_entry *entry;
-	char channel_name[NAME_LEN+STR_PADD];
+	struct _queue_entry *entry;	
 	char s2s_username[NAME_LEN+STR_PADD];
 	unique_t id;
 	rid_t type;
@@ -50,7 +49,7 @@ rid_t handle_request(char *data){
 				memcpy(&sreq_union.sreq_name, data, sizeof(struct _req_leave));
 				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv S2S Leave %s", node->ipaddr, node->port_str, sreq_union.sreq_name.name);
 				log_recv();
-				if(channel = channel_search(sreq_union.sreq_name.name, &channel_manager)){
+				if((channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
 					if(rtable_search(channel, node) > -1){
 						if(rtable_prune(channel, node, &server_manager) < 0){
 							printf("%s:%s\terror: Failed to prune %s's routing table\n", server_info.ipaddr_str, server_info.portno_str, channel->channel_name);
@@ -74,7 +73,7 @@ rid_t handle_request(char *data){
 					rtable_prune(channel, node, &server_manager);
 					goto RET;
 				}
-				if(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)){
+				if((channel = channel_search(sreq_union.sreq_say.channel, &channel_manager))){
 					//snprintf(LOG_RECV, LOGMSG_LEN, "Channel %s has %d clients and %d table_size.", channel->channel_name, channel->num_clients, channel->table_size);
 					//log_recv();
 					/*Remove this server from the channel tree if the message can't be forwarded*/
@@ -136,7 +135,7 @@ rid_t handle_request(char *data){
 				snprintf(LOG_RECV, LOGMSG_LEN, "%s:%s\trecv Request Logout %s", 
 					client_info.ipaddr_str, client_info.portno_str, client->username);
 				log_recv();
-				client_logout(client, &client_manager, &channel_manager);
+				client_logout(client, &client_manager);
 				goto RET;
 
 			case REQ_LIST:

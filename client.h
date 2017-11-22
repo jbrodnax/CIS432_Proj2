@@ -25,6 +25,7 @@ struct _client_info{
 	time_t timestamp;
 };
 
+void *thread_keepalive();
 struct _channel_sub *channel_search(char *name, struct _client_info *cl);
 struct _channel_sub *channel_switch(char *name, struct _client_info *cl);
 struct _channel_sub *channel_list_tail(struct _client_info *cl);

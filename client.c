@@ -38,7 +38,7 @@ int send_data(){
 
 	serverlen = sizeof(struct sockaddr);
 	if(output_size < sizeof(rid_t) || output_size > BUFSIZE){
-		fprintf(stderr, "Error in send_data: output_size has invalid size of (%u)\n", output_size);
+		fprintf(stderr, "Error in send_data: output_size has invalid size.\n");
 		return -1;
 	}
 
@@ -54,7 +54,7 @@ int send_data(){
 	return 0;
 }
 
-void *thread_keepalive(void *vargp){
+void *thread_keepalive(){
 	int n, serverlen;
 	time_t current_time;
 
@@ -94,6 +94,8 @@ rid_t build_request(rid_t type, int argc, char *argv[]){
 			memcpy(output, &req_logout, output_size);
 			return REQ_LOGOUT;
 		case REQ_JOIN:
+			if(argc != 1)
+				return RET_FAILURE;
 			output_size = sizeof(struct _req_join);
 			memset(&req_join, 0, output_size);
 			req_join.type_id = REQ_JOIN;
@@ -101,6 +103,8 @@ rid_t build_request(rid_t type, int argc, char *argv[]){
 			memcpy(output, &req_join, output_size);	
 			return REQ_JOIN;
 		case REQ_LEAVE:
+			if(argc != 1)
+				return RET_FAILURE;
 			output_size = sizeof(struct _req_leave);
 			memset(&req_leave, 0, output_size);
 			req_leave.type_id = REQ_LEAVE;
@@ -125,6 +129,8 @@ rid_t build_request(rid_t type, int argc, char *argv[]){
 			memcpy(output, &req_list, output_size);
 			return REQ_LIST;
 		case REQ_WHO:
+			if(argc != 1)
+				return RET_FAILURE;
 			output_size = sizeof(struct _req_who);
 			memset(&req_who, 0, output_size);
 			req_who.type_id = REQ_WHO;
@@ -141,9 +147,7 @@ rid_t build_request(rid_t type, int argc, char *argv[]){
 
 rid_t resolve_cmd(int argc, char *argv[]){
 	struct _channel_sub *ch;
-	char channel_name[NAME_LEN+STR_PADD];
-	int i = 0;
-	int n;
+	char channel_name[NAME_LEN+STR_PADD];	
 
 	if(!memcmp(argv[0], _CMD_EXIT, strlen(_CMD_EXIT))){
 		if(build_request(REQ_LOGOUT, 0, NULL) == REQ_LOGOUT){
@@ -160,7 +164,7 @@ rid_t resolve_cmd(int argc, char *argv[]){
 		if(!channel_add(channel_name, &client_info)){
 			return RET_FAILURE;
 		}
-		if(build_request(REQ_JOIN, 1, argv) == REQ_JOIN){
+		if(build_request(REQ_JOIN, argc, argv) == REQ_JOIN){
 			if(send_data() > -1){
 				return REQ_JOIN;
 			}else{
@@ -178,7 +182,7 @@ rid_t resolve_cmd(int argc, char *argv[]){
 			printf("[-] Error: cannot leave active channel. Please switch first.\n");
 			return RET_FAILURE;
 		}
-		if(build_request(REQ_LEAVE, 1, argv) == REQ_LEAVE){
+		if(build_request(REQ_LEAVE, argc, argv) == REQ_LEAVE){
 			if(send_data() > -1){
 				channel_remove(ch, &client_info);
 				return REQ_LEAVE;
@@ -207,7 +211,7 @@ rid_t resolve_cmd(int argc, char *argv[]){
 	else if(!memcmp(argv[0], _CMD_WHO, strlen(_CMD_WHO))){
 		memset(channel_name, 0, (NAME_LEN+STR_PADD));
                 memcpy(channel_name, argv[1], NAME_LEN);
-		if(build_request(REQ_WHO, 1, argv) == REQ_WHO){
+		if(build_request(REQ_WHO, argc, argv) == REQ_WHO){
 			if(send_data() > -1)
 				return REQ_WHO;
 			else
@@ -226,16 +230,16 @@ void handle_sock_input(int sockfd, char *input){
 	char safe_name_buf2[NAME_LEN+STR_PADD];
 	char safe_text_buf[TEXT_LEN+STR_PADD];
 	struct sockaddr_in serveraddr;
-	int serverlen;
-	int n, i, l, offset;
-	rid_t type;
+	socklen_t serverlen;
+	int n, m, l, offset;
+	rid_t type, i;
 
 	memset(buf, 0, (sizeof(struct _rsp_who)+STR_PADD));
 	memset(&serveraddr, 0, sizeof(struct sockaddr_in));
 	serverlen = sizeof(struct sockaddr_in);
 
-	n = recvfrom(sockfd, buf, (sizeof(struct _rsp_who)), 0, (struct sockaddr*)&serveraddr, &serverlen);
-	if(n < 0){
+	m = recvfrom(sockfd, buf, (sizeof(struct _rsp_who)), 0, (struct sockaddr*)&serveraddr, &serverlen);
+	if(m < 0){
 		perror("Error in recvfrom");
 		return;
 	}
@@ -248,13 +252,13 @@ void handle_sock_input(int sockfd, char *input){
 
 	/*Clean user prompt*/
 	l = (strlen(input) + strlen(PROMPT_SYM));
-	for(i=0; i < l; i++)
+	for(n=0; n < l; n++)
 		write(1, DST_BACKSPACE, strlen(DST_BACKSPACE));
 
 	switch (type){
 		case RSP_SAY:
-			if(n != sizeof(struct _rsp_say)){
-				printf("[-] Error: received Say response with invalid size (%d)\n", n);
+			if(m != sizeof(struct _rsp_say)){
+				printf("[-] Error: received Say response with invalid size (%d)\n", m);
 				break;
 			}
 			memcpy(&rsp_say, buf, sizeof(struct _rsp_say));
@@ -268,7 +272,7 @@ void handle_sock_input(int sockfd, char *input){
 			break;
 		case RSP_LIST:
 			memset(&rsp_list, 0, sizeof(struct _rsp_list));
-			memcpy(&rsp_list, buf, n);
+			memcpy(&rsp_list, buf, m);
 			if(rsp_list.num_channels < 1 || rsp_list.num_channels > LIST_LEN){
 				printf("[-] Error: list response had invalid number of channels\n");
 				break;
@@ -284,7 +288,7 @@ void handle_sock_input(int sockfd, char *input){
 			break;
 		case RSP_WHO:
 			memset(&rsp_who, 0, sizeof(struct _rsp_who));
-			memcpy(&rsp_who, buf, n);
+			memcpy(&rsp_who, buf, m);
 			if(rsp_who.num_users > WHO_LEN){
 				printf("[-] Error: who response had invalid number of users\n");
 				break;
@@ -301,7 +305,7 @@ void handle_sock_input(int sockfd, char *input){
 			break;
 		case RSP_ERR:
 			memset(&rsp_err, 0, sizeof(struct _rsp_err));
-			memcpy(&rsp_err, buf, n);
+			memcpy(&rsp_err, buf, m);
 			memset(safe_text_buf, 0, (TEXT_LEN+STR_PADD));
 			memcpy(safe_text_buf, rsp_err.message, TEXT_LEN);
 			printf("[Server Error]: %s\n", safe_text_buf);
@@ -312,8 +316,8 @@ void handle_sock_input(int sockfd, char *input){
 	/*Restore user prompt*/
 	l = strlen(input);
 	write(1, PROMPT_SYM, strlen(PROMPT_SYM));
-	for(i=0; i < l; i++)
-		write(1, &input[i], 1);
+	for(n=0; n < l; n++)
+		write(1, &input[n], 1);
 
 	return;
 }
@@ -334,8 +338,7 @@ void handle_user_input(char *input, int n){
 /*Isn't this function beautiful?...*/
 	char *argv[2];
 	char cmd_name[MAXCMD_LEN+STR_PADD];
-	char cmd_arg1[NAME_LEN+STR_PADD];
-	char c;
+	char cmd_arg1[NAME_LEN+STR_PADD];	
 	int j;
 	int i = 0;
 
@@ -366,7 +369,7 @@ void handle_user_input(char *input, int n){
 		/*Assume command has no arguments*/
 		if(input[i] == 0x00){
 			argv[0] = cmd_name;	
-			if(resolve_cmd(1, argv) == REQ_LOGOUT){
+			if(resolve_cmd(0, argv) == REQ_LOGOUT){
 				channel_clean(&client_info);
 				free(input);
 				cooked_mode();
@@ -386,7 +389,7 @@ void handle_user_input(char *input, int n){
 			strncpy(cmd_arg1, &input[i], j);
 			argv[0] = cmd_name;
 			argv[1] = cmd_arg1;
-			if(resolve_cmd(2, argv) == RET_FAILURE)
+			if(resolve_cmd(1, argv) == RET_FAILURE)
 				printf("[-] Command failure!\n");
 			return;
 		}else{
