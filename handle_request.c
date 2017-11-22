@@ -1,7 +1,5 @@
 #include "server.h"
 
-//char common[]="Common";
-
 rid_t handle_request(char *data){
 	_sreq_union sreq_union;
 	struct client_entry *client;
@@ -38,7 +36,7 @@ rid_t handle_request(char *data){
 				log_recv();
 				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
 					channel = channel_create(sreq_union.sreq_name.name, &channel_manager, &server_manager);
-					propogate_join(channel, node, server_info.sockfd);
+					propogate_join(channel, node, server_info.sockfd, &server_manager);
 				}else if(rtable_search(channel, node) < 0){
 					rtable_add(channel, node);
 				}else{
@@ -78,14 +76,12 @@ rid_t handle_request(char *data){
 					//snprintf(LOG_RECV, LOGMSG_LEN, "Channel %s has %d clients and %d table_size.", channel->channel_name, channel->num_clients, channel->table_size);
 					//log_recv();
 					/*Remove this server from the channel tree if the message can't be forwarded*/
-					if(channel->num_clients < 1 && channel->table_size < 2){
-						if(node_compare(node, channel->routing_table[0]) == 0){
-							channel_remove(channel, &channel_manager);
-							send_leave(sreq_union.sreq_say.channel, node, server_info.sockfd);
-							goto RET;
-						}
+					if(channel->num_clients < 1 && channel->table_size < 2){	
+						channel_remove(channel, &channel_manager);
+						send_leave(sreq_union.sreq_say.channel, node, server_info.sockfd);
+						goto RET;
 					}
-					propogate_say(channel, s2s_username, id, &sreq_union.sreq_say, node, server_info.sockfd, NULL);
+					propogate_say(channel, s2s_username, id, &sreq_union.sreq_say, node, server_info.sockfd, &server_manager);
 					if(!(req_say = malloc(sizeof(struct _req_say))))
 						goto MEM_ERR;
 					req_say->type_id = REQ_SAY;
@@ -173,12 +169,7 @@ rid_t handle_request(char *data){
 				log_recv();
 				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
 					channel = channel_create(sreq_union.sreq_name.name, &channel_manager, &server_manager);
-					propogate_join(channel, NULL, server_info.sockfd);
-				/*}else if(channel_manager.sub_initchannel == 0){
-					if(!strncmp(channel->channel_name, common, NAME_LEN)){
-						propogate_join(channel, NULL, server_info.sockfd);
-						channel_manager.sub_initchannel = 1;
-					}*/
+					propogate_join(channel, NULL, server_info.sockfd, &server_manager);	
 				}
 				client_add_channel(channel, client);
 				channel_add_client(client, channel);
@@ -191,9 +182,7 @@ rid_t handle_request(char *data){
 				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager)))
 					goto CHDNE;
 				client_remove_channel(channel, client);
-				channel_remove_client(client, channel);
-				//if(channel->num_clients < 1)
-				//	channel_remove(channel, &channel_manager);
+				channel_remove_client(client, channel);	
 				goto RET;
 
 			case REQ_SAY:
@@ -203,7 +192,7 @@ rid_t handle_request(char *data){
 				log_recv();
 				if(!(channel = channel_search(sreq_union.sreq_say.channel, &channel_manager)))
 					goto CHDNE;
-				propogate_say(NULL, client->username, 0, &sreq_union.sreq_say, NULL, server_info.sockfd, &server_manager);
+				propogate_say(channel, client->username, 0, &sreq_union.sreq_say, NULL, server_info.sockfd, &server_manager);
 				if(!(req_say = malloc(sizeof(struct _req_say))))
 					goto MEM_ERR;
 				memset(req_say, 0, sizeof(struct _req_say));

@@ -181,7 +181,7 @@ int rtable_add(struct channel_entry *ch, struct _adjacent_server *node);
 int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node);
 int channel_softstate(struct _channel_manager *chm);
 int resubscribe(struct _channel_manager *chm, int sockfd);
-int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, int sockfd);
+int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm);
 int save_id(unique_t id, struct _server_manager *svm);
 int propogate_say(struct channel_entry *ch, char *name, unique_t id, _sreq_say *req, struct _adjacent_server *sender, int sockfd, struct _server_manager *svm);
 int send_leave(char *ch, struct _adjacent_server *node, int sockfd);

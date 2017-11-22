@@ -1,13 +1,10 @@
 #include "server.h"
 
 pthread_t tid[3];
-//pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_rwlock_t channel_lock;
 pthread_rwlock_t client_lock;
 pthread_rwlock_t node_lock;
-//char init_channelname[]="Common";
 char ERR_MSG[TEXT_LEN];
-
 time_t timestamp;
 
 void error(char *msg){
@@ -51,19 +48,7 @@ void log_send(){
 	memset(LOG_SEND, 0, LOGMSG_LEN);
 	return;
 }
-/*
-void test_chm(){
-	struct channel_entry *channel;
 
-	init_rwlocks();
-	if(!(channel = channel_create(init_channelname, &channel_manager, &server_manager))){
-		fprintf(stderr, "[!] Error: Channel creation of (%s) failed.");
-		exit(EXIT_FAILURE);
-	}
-	//propogate_join(channel, NULL, server_info.sockfd);
-	return;
-}
-*/
 void init_servertree(int argc, char *argv[]){
 	char *hostname;
 	char *port;
@@ -91,18 +76,16 @@ void init_server(){
 	int rv, optval;
 	void *ptr;
 
-	//printf("Initializing DuckChat Server...\n");
 	/*Zero-out all global structs*/
 	memset(&client_manager, 0, sizeof(struct _client_manager));
 	memset(&channel_manager, 0, sizeof(struct _channel_manager));
 	memset(&main_queue, 0, sizeof(struct _req_queue));
 	memset(&hints, 0, sizeof(hints));
-	/*Init server's addr info for either IPv6 or IPv4, UDP socket, and default system's IP addr*/
-	hints.ai_family = AF_INET;//AF_UNSPEC;
+
+	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	//printf("Server's hostname:port => %s:%s\n", server_info.hostname, server_info.portno_str);
 	if((rv = getaddrinfo(server_info.hostname, server_info.portno_str, &hints, &servinfo)) != 0){
 		fprintf(stderr, "in getaddrinfo: %s\n", gai_strerror(rv));
 		exit(1);
@@ -195,9 +178,7 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		memcpy(rsp_say.username, entry->username, NAME_LEN);
 		memcpy(rsp_say.text, entry->req_say->text, TEXT_LEN);
 		for(i=0; i < ch->num_clients; i++){	
-			client = ch->client_list[i];	
-			//printf("[<] Sending Client (%s)\tData (%s)\ton Channel(%s)\tfrom User(%s)\n",
-				//client->username, rsp_say.text, rsp_say.channel, rsp_say.username);
+			client = ch->client_list[i];		
 			n = sendto(sockfd, &rsp_say, sizeof(struct _rsp_say), 0, (struct sockaddr *)&client->clientaddr, sizeof(struct sockaddr));
 			if(n < 0)
 				perror("Error in sendto");
@@ -208,8 +189,7 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		memset(&rsp_list, 0, sizeof(struct _rsp_list));
 		rsp_list.type_id = RSP_LIST;
 		if(channel_list(&rsp_list, &channel_manager) > -1){
-			i = (sizeof(struct _rsp_list) - ((LIST_LEN*NAME_LEN)-(rsp_list.num_channels*NAME_LEN)));	
-			//printf("[+] List request got (%hu) number of channels and response is of size (%d).\n", rsp_list.num_channels, i);
+			i = (sizeof(struct _rsp_list) - ((LIST_LEN*NAME_LEN)-(rsp_list.num_channels*NAME_LEN)));		
 			n = sendto(sockfd, &rsp_list, i, 0, (struct sockaddr *)&entry->clientaddr, sizeof(struct sockaddr));
 			if(n < 0)
 				perror("Error in sendto");
@@ -230,7 +210,6 @@ void send_data(struct _queue_entry *entry, int sockfd){
 		memcpy(rsp_who.channel, entry->req_who->channel, NAME_LEN);
 		if(channel_who(&rsp_who, ch) > -1){
 			i = (sizeof(struct _rsp_who) - ((WHO_LEN*NAME_LEN)-(rsp_who.num_users*NAME_LEN)));	
-			//printf("[+] Who request has (%hu) number of channels and response is of size (%d).\n", rsp_who.num_users, i);
 			n = sendto(sockfd, &rsp_who, i, 0, (struct sockaddr *)&entry->clientaddr, sizeof(struct sockaddr));
 			if(n < 0)
 				perror("Error in sendto");
@@ -277,33 +256,6 @@ void *thread_softstate(void *vargp){
 	}
 }
 
-void recvdata_IPv6(){
-	char input[BUFSIZE+STR_PADD];
-	int n;
-	socklen_t clientlen;
-
-	clientlen = sizeof(client_info.clientaddr6);
-	inet_ntop(AF_INET6, &(server_info.serveraddr6->sin6_addr), server_info.ipaddr_str, INET6_ADDRSTRLEN);
-	printf("[+] Server Info:\n\tIPv6 Addr: %s\n\tPort: %d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr6->sin6_port));
-	printf("Server is now waiting for data...\n");
-	while(1){
-		memset(input, 0, BUFSIZE+STR_PADD);
-		memset(&client_info, 0, sizeof(struct _client_info));
-
-		n = recvfrom(server_info.sockfd, input, BUFSIZE, 0, (struct sockaddr*)&client_info.clientaddr6, &clientlen);
-		if(n < 0){
-			perror("[?] Issue in recvfrom");
-			continue;
-		}
-		getnameinfo((struct sockaddr*)&client_info.clientaddr6, sizeof(struct sockaddr), 
-			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
-		//printf("Server received data from:\n\tHost: %s\n\tService: %s\n\n", client_info.ipaddr_str, client_info.portno_str);
-		handle_request(input);	
-	}
-
-	return;
-}
-
 void recvdata_IPv4(){
 	char input[BUFSIZE+STR_PADD];
 	int n;
@@ -312,7 +264,7 @@ void recvdata_IPv4(){
 
 	clientlen = sizeof(client_info.clientaddr);
 	inet_ntop(AF_INET, &(server_info.serveraddr->sin_addr), server_info.ipaddr_str, INET_ADDRSTRLEN);
-	printf("Server Setup Complete.\nAccepting data on bound socket \t%s:%d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr->sin_port));
+	printf("[+] Server Setup Complete:\tAccepting data on bound socket \t%s:%d\n", server_info.ipaddr_str, ntohs(server_info.serveraddr->sin_port));
 	while(1){
 		memset(input, 0, BUFSIZE+STR_PADD);
 		memset(&client_info, 0, sizeof(struct _client_info));
@@ -323,8 +275,7 @@ void recvdata_IPv4(){
 			continue;
 		}
 		getnameinfo((struct sockaddr*)&client_info.clientaddr, sizeof(struct sockaddr), 
-			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);
-		//printf("%s:%s received data from:\tHost: %s\tService: %s\n\n", server_info.ipaddr_str, server_info.portno_str, client_info.ipaddr_str, client_info.portno_str);
+			client_info.ipaddr_str, 256, client_info.portno_str, 32, NI_NUMERICHOST | NI_NUMERICSERV);	
 		handle_request(input);
 	}
 
@@ -337,13 +288,13 @@ int main(int argc, char *argv[]){
 	void *ptr;
 
 	if((argc%2) != 1){
-		printf("Usage: \n");
+		printf("Usage: <domain/ip> <port #> (Followed by N adjacent server <domain/ip> <port #> pairs\n");
 		exit(0);
 	}
 
 	n = strlen(argv[2]);
 	if(n < 1 || n > 5){
-		fprintf(stderr, "Error: received invalid 2nd argument (port number).\n");
+		fprintf(stderr, "Error: received invalid port number.\n");
 		exit(0);
 	}
 	if(signal(SIGINT, sig_handler) == SIG_ERR){
@@ -367,10 +318,8 @@ int main(int argc, char *argv[]){
 	init_server();
 	init_servertree(argc, argv);
 	
-	//test_chm();
 	switch (p->ai_family){
-		case AF_INET:
-			//Create response thread
+		case AF_INET:	
 			pthread_create(&tid[0], NULL, thread_responder, NULL);
 			pthread_create(&tid[1], NULL, thread_softstate, NULL);
 			pthread_create(&tid[2], NULL, thread_resubscribe, NULL);
