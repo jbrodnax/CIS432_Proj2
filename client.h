@@ -1,5 +1,5 @@
 #include "duckchat.h"
-#include "raw.h"
+#include "client_modules/raw.h"
 
 #define STDIN 0
 

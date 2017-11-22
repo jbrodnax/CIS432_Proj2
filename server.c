@@ -279,7 +279,7 @@ int main(int argc, char *argv[]){
 	int n;	
 
 	if((argc%2) != 1){
-		printf("Usage: <domain/ip> <port #> (followed by N adjacent server <domain/ip> <port #> pairs)\n");
+		printf("Usage: <hostname/ip> <port #> (followed by N adjacent server <hostname/ip> <port #> pairs)\n");
 		exit(0);
 	}
 
@@ -316,10 +316,6 @@ int main(int argc, char *argv[]){
 			pthread_create(&tid[2], NULL, thread_resubscribe, NULL);
 			recvdata_IPv4();
 			break;
-		case AF_INET6:
-			puts("ai_family IPv6");	
-			//recvdata_IPv6();
-			//break;
 		default:
 			fprintf(stderr, "Error: ai_family invalid.\n");
 			exit(EXIT_FAILURE);

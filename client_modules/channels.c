@@ -1,4 +1,4 @@
-#include "client.h"
+#include "../client.h"
 
 void error_msg(char *err_msg){
 	if(!err_msg){

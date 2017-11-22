@@ -1,4 +1,4 @@
-#include "server.h"
+#include "../server.h"
 
 rid_t handle_request(char *data){
 	_sreq_union sreq_union;

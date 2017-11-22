@@ -1,4 +1,4 @@
-#include "server.h"
+#include "../server.h"
 
 char client_err1[]="Client list already initialized.";
 char client_err2[]="client_add received NULL argument.";

@@ -78,7 +78,6 @@ struct _channel_manager{
 	struct channel_entry *list_head;
 	struct channel_entry *list_tail;
 	int num_channels;
-	//uint32_t sub_initchannel;
 };
 
 struct _server_info{
@@ -135,7 +134,7 @@ struct _client_info client_info;
 struct _server_manager server_manager;
 struct addrinfo hints, *servinfo, *p;
 
-pthread_mutex_t lock1; //lock_send, lock_recv;
+pthread_mutex_t lock1;
 pthread_rwlock_t channel_lock;
 pthread_rwlock_t client_lock;
 pthread_rwlock_t node_lock;
@@ -144,7 +143,6 @@ char *LOG_SEND;
 
 /*client_manager.c function prototypes*/
 void error_msg(char *err_msg);
-//void init_rwlocks();
 void client_print(struct client_entry *client);
 struct client_entry *client_search(struct sockaddr_in *clientaddr, struct _client_manager *clm);
 struct client_entry *client_init_list();

@@ -1,4 +1,4 @@
-#include "server.h"
+#include "../server.h"
 
 struct _adjacent_server *node_create(char *hostname, char *port, struct _server_manager *svm){
 	struct _adjacent_server *new_node;	
