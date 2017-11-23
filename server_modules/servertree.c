@@ -123,6 +123,28 @@ int node_compare(struct _adjacent_server *node1, struct _adjacent_server *node2)
 	return -1;
 }
 
+void init_id_rng(){
+	int n;
+	unsigned int seed;
+	FILE *fp;
+
+	if(!(fp = fopen("/dev/urandom", "r"))){
+		perror("Error reading from /dev/urandom");
+		exit(EXIT_FAILURE);
+	}
+	if(!(fread(&seed, sizeof(unsigned int), 1, fp))){
+		perror("Error reading from /dev/urandom");
+		exit(EXIT_FAILURE);
+	}
+	fclose(fp);
+	srand(seed);
+
+	puts("Init IDs:");
+	for(n=0;n<5;n++)
+		printf("%u\n", ((unsigned int)rand()%RAND_MAX));
+	return;
+}
+
 unique_t generate_id(struct _S2S_say *req){
 	unique_t id;
 	FILE *fp;
@@ -415,25 +437,24 @@ int propogate_join(struct channel_entry *ch, struct _adjacent_server *sender, in
 /*This storage method for ids is terrible*/
 int save_id(unique_t id, struct _server_manager *svm){
 	int n, retval;
+	unique_t bp[UID_MAX];
+
+	if(svm->num_ids >= UID_MAX-1){
+		memset(bp, 0, (sizeof(unique_t)*UID_MAX));      
+		memcpy(bp, &svm->recent_ids[(UID_MAX/2)], (sizeof(unique_t)*(UID_MAX/2)));
+		memcpy(svm->recent_ids, bp, UID_MAX);
+		svm->num_ids = (UID_MAX/2);
+	}
 
 	retval = 0;
 	for(n=0; n < svm->num_ids; n++){
-		if(n >= UID_MAX-1){	
-			memset(svm->recent_ids, 0, sizeof(unique_t)*UID_MAX);
-			if(retval == 0){
-				svm->recent_ids[0] = id;
-				svm->num_ids = 1;
-				return retval;
-			}
-		}
-		if(svm->recent_ids[n] == id){	
-			retval = 1;
-		}
+		if((svm->recent_ids[n] ^ id) == 0)
+			return 1;
 	}
-	if(retval == 0){
-		svm->recent_ids[n] = id;
-		svm->num_ids++;
-	}
+
+	svm->recent_ids[n] = id;
+	svm->num_ids++;
+
 	return retval;
 }
 

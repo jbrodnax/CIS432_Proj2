@@ -33,7 +33,6 @@ struct _adjacent_server{
 
 struct _server_manager{
 	struct _adjacent_server *tree[TREE_MAX];
-	struct _adjacent_server *last_accessed;
 	unique_t recent_ids[UID_MAX];
 	int num_ids;
 	int tree_size;
@@ -176,6 +175,7 @@ int rtable_init(struct channel_entry *ch, struct _server_manager *svm);
 int rtable_prune(struct channel_entry *ch, struct _adjacent_server *node, struct _server_manager *svm);
 int rtable_search(struct channel_entry *ch, struct _adjacent_server *node);
 int rtable_add(struct channel_entry *ch, struct _adjacent_server *node);
+void init_id_rng();
 int node_keepalive(struct channel_entry *ch, struct _adjacent_server *node);
 int channel_softstate(struct _channel_manager *chm);
 int resubscribe(struct _channel_manager *chm, int sockfd);

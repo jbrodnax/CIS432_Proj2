@@ -308,7 +308,7 @@ int main(int argc, char *argv[]){
 	}
 	init_server();
 	init_servertree(argc, argv);
-	
+
 	switch (p->ai_family){
 		case AF_INET:	
 			pthread_create(&tid[0], NULL, thread_responder, NULL);
