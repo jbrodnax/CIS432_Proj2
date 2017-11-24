@@ -17,7 +17,7 @@ Answer the questions by selecting one of the given options. You may add addition
 	Since rand() returns a 32bit value, each generated id is a 64bit combined value of two rand() return values.
 
 - Does the server renew Joins once per minute? yes/no
-	Yes. The server's renew timer is defined in 'duckchat.h' as SR_TIMEOUT. This can safely be modified to a shorter time for testing purposes.
+	Yes. The server's renew timer is defined in 'duckchat.h' as SR_TIMEOUT. This can safely be modified to a different time for testing purposes.
   
 - Does the server remove Joins older than two minutes? yes/no
 	Yes. This time limit is defined in 'duckchat.h' as SS_TIMEOUT, which also defines the time limit for clients. 
@@ -27,10 +27,10 @@ Answer the questions by selecting one of the given options. You may add addition
 	Yes. If a server (with no clients) receives an S2S Say message, and the only adjacent server in the channel is the sender, then the server responds with an S2S Leave.
 
 - Does the server reply with a Leave message when it receives a duplicate Say message? yes/no 
-	Yes.
+	Yes. S2S Say message ids are compared against values in a cache of other recent message ids. An S2S Leave is sent if match is found.
 
 - Does the server avoid sending inappropriate Join, Leave, or Say messages? yes/no
-	Yes. Server has been successfully tested on all topologies presented in start_servers.sh plus a couple additional ones.
+	Yes. Server has been successfully tested on all topologies presented in start_servers.sh as well as a couple additional topologies.
 
 - Does the server have all the functionality from program #1 when working in isolation? yes/no 
 	Yes. Server also handles Keep Alive requests from client.
