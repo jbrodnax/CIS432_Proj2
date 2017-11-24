@@ -24,6 +24,7 @@
 #define LIST_LEN	128
 #define WHO_LEN		128
 #define BUFSIZE		1024
+/*Defines max number of clients per channel. This is safe to modify*/
 #define MAX_CHANNELCLIENTS	128
 #define MAXQSIZE	128
 #define MAXCMD_LEN	8

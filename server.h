@@ -1,9 +1,13 @@
 #include "duckchat.h"
 
+/*Defines max number of adjacent servers*/
 #define TREE_MAX 16
+/*Defines S2S Say unique id cache size*/
 #define UID_MAX 128
+/*S2S Say unique id type*/
 typedef uint64_t unique_t;
 
+/*Defines inter-server request data structures*/
 struct __attribute__((packed)) _S2S_join{
 	rid_t type_id;
 	char channel[NAME_LEN];
@@ -22,6 +26,7 @@ struct __attribute__((packed)) _S2S_say{
 	char text[TEXT_LEN];
 };
 
+/*Stores info regarding an adjacent server*/
 struct _adjacent_server{
 	struct sockaddr_in *serveraddr;
 	struct addrinfo hints, *servinfo;
@@ -79,6 +84,7 @@ struct _channel_manager{
 	int num_channels;
 };
 
+/*stores info regarding this server process*/
 struct _server_info{
 	char ipaddr_str[256];
 	char portno_str[32];

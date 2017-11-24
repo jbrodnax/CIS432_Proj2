@@ -11,7 +11,7 @@ void error(char *msg){
 void sig_handler(int signo){
 	if(signo == SIGINT){
 		printf("SIGINT Caught.\n");
-		//FIX: implement clean up
+		//FIX: implement clean up of allocated memory
 		freeaddrinfo(servinfo);
 		exit(EXIT_SUCCESS);
 	}

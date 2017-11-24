@@ -1,17 +1,5 @@
 #include "../server.h"
 
-char client_err1[]="Client list already initialized.";
-char client_err2[]="client_add received NULL argument.";
-char client_err3[]="client_remove received NULL clientaddr ptr.";
-char client_err4[]="client_list is empty.";
-
-char channel_err1[]="channel_create received null argument.";
-char channel_err2[]=".";
-char channel_err3[]="channel_add_client received null argument,";
-char channel_err4[]="max number of clients on channel reached.";
-char channel_err5[]="channel_remove_client received null argument.";
-char channel_err6[]="no clients are in this channel.";
-
 void error_msg(char *err_msg){
 	if(!err_msg){
 		perror("[-] ERROR:\t ");
@@ -183,10 +171,8 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 */
 	struct client_entry *new_client;
 
-	if(!name || !clientaddr){
-		error_msg(client_err2);
+	if(!name || !clientaddr)	
 		return NULL;
-	}
 
 	pthread_rwlock_wrlock(&client_lock);
 	if(!clm->list_head){
@@ -224,14 +210,8 @@ struct client_entry *client_add(char *name, struct sockaddr_in *clientaddr, stru
 
 int client_remove(struct client_entry *client, struct _client_manager *clm){
 
-	if(!client){
-		error_msg(client_err3);
+	if(!client || !clm)	
 		return -1;
-	}
-	if(!clm){
-		error_msg(client_err4);
-		return -1;
-	}
 
 	/*Unlink list node and update clm head or tail if unlinking head or tail*/
 	pthread_rwlock_wrlock(&client_lock);
@@ -351,10 +331,8 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm, s
 */
 	struct channel_entry *new_channel;
 
-	if(!name || !chm || !svm){
-		error_msg(channel_err1);
+	if(!name || !chm || !svm)	
 		return NULL;
-	}
 
 	pthread_rwlock_wrlock(&channel_lock);
 	if(!chm->list_head){
@@ -395,14 +373,8 @@ struct channel_entry *channel_create(char *name, struct _channel_manager *chm, s
 
 int channel_remove(struct channel_entry *channel, struct _channel_manager *chm){
 
-	if(!channel){
-		error_msg(client_err3);
+	if(!channel || !chm)	
 		return -1;
-	}
-	if(!chm){
-		error_msg(client_err4);
-		return -1;
-	}
 
 	pthread_rwlock_wrlock(&channel_lock);
 	/*Unlink list node and update chm head or tail if unlinking head or tail*/
@@ -450,16 +422,13 @@ void channel_clean(struct _channel_manager *chm){
 
 int channel_add_client(struct client_entry *client, struct channel_entry *channel){
 
-	if(!client || !channel){
-		error_msg(channel_err3);
+	if(!client || !channel)
 		return -1;
-	}
+
 	pthread_rwlock_wrlock(&channel_lock);
 	/*Max number of clients per channel is actually 1 less than defined since the last array index needs to remain 0 for shifting during removal*/
-	if(channel->num_clients >= MAX_CHANNELCLIENTS-1){
-		error_msg(channel_err4);
+	if(channel->num_clients >= MAX_CHANNELCLIENTS-1)	
 		return -1;
-	}
 
 	channel->client_list[channel->num_clients] = client;
 	channel->num_clients++;
@@ -473,15 +442,12 @@ int channel_remove_client(struct client_entry *client, struct channel_entry *cha
 	struct client_entry *current;	
 	int n = 0;
 
-	if(!client || !channel){
-		error_msg(channel_err5);
+	if(!client || !channel)
 		return -1;
-	}
 
 	pthread_rwlock_wrlock(&channel_lock);
 	if(channel->num_clients < 1){
-		pthread_rwlock_unlock(&channel_lock);
-		error_msg(channel_err6);
+		pthread_rwlock_unlock(&channel_lock);	
 		return -1;
 	}
 

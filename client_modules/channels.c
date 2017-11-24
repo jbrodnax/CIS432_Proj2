@@ -1,5 +1,11 @@
 #include "../client.h"
 
+/*
+* channel_list.c defines all functions related to 
+* management of channels on the client-side.
+* Channels are stored as a doubly linked list of
+* _channel_sub structs (defined in client.h).
+*/
 void error_msg(char *err_msg){
 	if(!err_msg){
 		perror("[-] ERROR:\n\t ");

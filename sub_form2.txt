@@ -1,0 +1,39 @@
+CIS 432 Introduction to Computer Networks
+Programming Assignment 02
+
+Student Name: John Brodnax
+Student IDs: 951178787
+
+Answer the questions by selecting one of the given options. You may add additional information if you wish to.
+
+- Does the server broadcast Joins correctly when a user requests a Join? yes/no
+	Yes. The server will broadcast an S2S Join to all adjacent servers if it is not already subscribed to that channel.
+ 
+- Does the server broadcast Joins correctly when receiving a Join from another server? yes/no 
+	Yes. The server will relay an S2S Join to all adjacent servers (excluding the sender) if it is not already subscribed to that channel.
+
+- Does the server generate unique identifiers correctly? yes/no 
+	Yes. Unique identifiers are generated using C's stdlib function rand() seeded with a value from /dev/urandom.
+	Since rand() returns a 32bit value, each generated id is a 64bit combined value of two rand() return values.
+
+- Does the server renew Joins once per minute? yes/no
+	Yes. The server's renew timer is defined in 'duckchat.h' as SR_TIMEOUT. This can safely be modified to a shorter time for testing purposes.
+  
+- Does the server remove Joins older than two minutes? yes/no
+	Yes. This time limit is defined in 'duckchat.h' as SS_TIMEOUT, which also defines the time limit for clients. 
+	If modifying SS_TIMEOUT for testing, be aware that clients who are inactive for longer than SS_TIMEOUT will be removed as well.
+ 
+- Does the server reply with a Leave message when it cannot forward a Say message? yes/no 
+	Yes. If a server (with no clients) receives an S2S Say message, and the only adjacent server in the channel is the sender, then the server responds with an S2S Leave.
+
+- Does the server reply with a Leave message when it receives a duplicate Say message? yes/no 
+	Yes.
+
+- Does the server avoid sending inappropriate Join, Leave, or Say messages? yes/no
+	Yes. Server has been successfully tested on all topologies presented in start_servers.sh plus a couple additional ones.
+
+- Does the server have all the functionality from program #1 when working in isolation? yes/no 
+	Yes. Server also handles Keep Alive requests from client.
+
+- Does the client have all the functionality from program #1? yes/no
+	Yes.
