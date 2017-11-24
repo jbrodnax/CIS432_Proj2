@@ -124,7 +124,10 @@ int node_compare(struct _adjacent_server *node1, struct _adjacent_server *node2)
 }
 
 void init_id_rng(){
-	int n;
+/*
+* Init S2S id rng by seeding rand with /dev/urandom value. Must be called
+* before any call to generate_id.
+*/
 	unsigned int seed;
 	FILE *fp;
 
@@ -139,33 +142,20 @@ void init_id_rng(){
 	fclose(fp);
 	srand(seed);
 
-	puts("Init IDs:");
-	for(n=0;n<5;n++)
-		printf("%u\n", ((unsigned int)rand()%RAND_MAX));
 	return;
 }
 
 unique_t generate_id(struct _S2S_say *req){
+/*retrieve 2 32bit values from rand and combine them into 64bit id value*/
 	unique_t id;
-	FILE *fp;
+	uint32_t msw, lsw;
 
-	if(!req){
-		error_msg("generate_id received null request pointer.");
-		return 0;
-	}
+	msw = ((unsigned int)rand()%RAND_MAX);
+	lsw = ((unsigned int)rand()%RAND_MAX);
 
-	if(!(fp = fopen("/dev/urandom", "r"))){
-		perror("Error reading from /dev/urandom");
-		exit(EXIT_FAILURE);
-	}
-	if(!(fread(&id, sizeof(unique_t), 1, fp))){
-		perror("Error reading from /dev/urandom");
-                exit(EXIT_FAILURE);
-	}
-	fclose(fp);
-
+	id = (unique_t)msw << 32 | lsw;
 	req->msg_id = id;
-	//printf("generated id: %llu\n", id);
+
 	return id;
 }
 
@@ -335,7 +325,8 @@ int channel_softstate(struct _channel_manager *chm){
 		while(i < ch->table_size){
 			if((current_time - ch->ss_rtable[i]->timestamp) >= SS_TIMEOUT){
 				n = i;
-				snprintf(log_msg, LOGMSG_LEN, "Timeout on channel %s from %s:%s", ch->channel_name, ch->routing_table[n]->ipaddr, ch->routing_table[n]->port_str);
+				snprintf(log_msg, LOGMSG_LEN, "Timeout on channel %s from %s:%s", 
+					ch->channel_name, ch->routing_table[n]->ipaddr, ch->routing_table[n]->port_str);
 				log_thread(log_msg);	
 				free(ch->ss_rtable[n]);
 				while(n < ch->table_size){

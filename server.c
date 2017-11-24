@@ -308,6 +308,7 @@ int main(int argc, char *argv[]){
 	}
 	init_server();
 	init_servertree(argc, argv);
+	init_id_rng();
 
 	switch (p->ai_family){
 		case AF_INET:	
