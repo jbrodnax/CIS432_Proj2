@@ -10,12 +10,12 @@
 
 <h3>Client:</h3>
 <b>Start:</b> ./client [IP or Domain of target server] [Port#] [Username] (e.g. ./client localhost 4000 User1)
-<br><b>Commands: (*taken from proj1 description)</b>
+<br><b>Commands:</b>
 <li><tt><b>/exit:</b></tt> Logout the user and exit the client software.</li>
 <li><tt><b>/join <i>channel</i></b></tt>: Join (subscribe in) the named channel, creating the channel if it does not exist.</li>
 <li><tt><b>/leave <i>channel</i></b></tt>: Leave the named channel.</li>
-<li><tt><b>/list</b></tt>: List the names of all channels.</li>
-<li><tt><b>/who <i>channel</i></b></tt>: List the users who are on the named channel.</li>
+<li><tt><b>/list</b></tt>: List the names of all channels on connected server (S2S List not implement).</li>
+<li><tt><b>/who <i>channel</i></b></tt>: List the users who are on the named channel on the connected server (S2S Who not implemented).</li>
 <li><tt><b>/switch <i>channel</i></b></tt>: Switch to an existing named channel that user has already joined.</li>
 
 <h3>Limits (Default config):</h3>

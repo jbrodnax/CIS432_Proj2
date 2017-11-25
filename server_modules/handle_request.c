@@ -1,4 +1,10 @@
 #include "../server.h"
+/*
+* Handles all received data on specified port number. Determines request type first and then attempts to 
+* validate client or adjacent server depending on request type.
+* Non-S2S request types requiring responses are enqueued for a sender thread to handle (thread_responder() defined in server.c).
+* 
+*/
 
 rid_t handle_request(char *data){
 	_sreq_union sreq_union;
@@ -38,6 +44,7 @@ rid_t handle_request(char *data){
 				if(!(channel = channel_search(sreq_union.sreq_name.name, &channel_manager))){
 					channel = channel_create(sreq_union.sreq_name.name, &channel_manager, &server_manager);
 					propogate_join(channel, node, server_info.sockfd, &server_manager);
+				/*If channel does exist but adjacent server is not in the routing table, add it.*/
 				}else if(rtable_search(channel, node) < 0){
 					rtable_add(channel, node);
 				}else{
