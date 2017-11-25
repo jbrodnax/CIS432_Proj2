@@ -20,11 +20,12 @@ Answer the questions by selecting one of the given options. You may add addition
 	Yes. The server's renew timer is defined in 'duckchat.h' as SR_TIMEOUT. This can safely be modified to a different time for testing purposes.
   
 - Does the server remove Joins older than two minutes? yes/no
-	Yes. This time limit is defined in 'duckchat.h' as SS_TIMEOUT, which also defines the time limit for clients. 
+	Yes. This time limit is defined in 'duckchat.h' as SS_TIMEOUT, which also defines the timeout for clients.
 	If modifying SS_TIMEOUT for testing, be aware that clients who are inactive for longer than SS_TIMEOUT will be removed as well.
  
 - Does the server reply with a Leave message when it cannot forward a Say message? yes/no 
 	Yes. If a server (with no clients) receives an S2S Say message, and the only adjacent server in the channel is the sender, then the server responds with an S2S Leave.
+	Additionally, a server (that was a leaf in a channel) can rejoin a channel tree if one its clients requests to join that channel.
 
 - Does the server reply with a Leave message when it receives a duplicate Say message? yes/no 
 	Yes. S2S Say message ids are compared against values in a cache of other recent message ids. An S2S Leave is sent if match is found.
@@ -37,3 +38,5 @@ Answer the questions by selecting one of the given options. You may add addition
 
 - Does the client have all the functionality from program #1? yes/no
 	Yes.
+
+* Additional project information can be found in the README.txt or README.md file.
